@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#18211b" />
+    <title>Alex App</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacion principal">
+        <div class="brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <h1>Alex App</h1>
+            <p>Centro personal</p>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Secciones">
+          <button class="nav-tab active" data-view="dashboard" type="button">
+            <span>Inicio</span>
+          </button>
+          <button class="nav-tab" data-view="finances" type="button">
+            <span>Finanzas</span>
+          </button>
+          <button class="nav-tab" data-view="tasks" type="button">
+            <span>Tareas</span>
+          </button>
+          <button class="nav-tab" data-view="meetings" type="button">
+            <span>Reuniones</span>
+          </button>
+          <button class="nav-tab" data-view="notes" type="button">
+            <span>Notas</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <p id="storage-status">Guardado local activo</p>
+          <button id="export-data" class="ghost-button" type="button">Exportar datos</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="today-label"></p>
+            <h2 id="view-title">Inicio</h2>
+          </div>
+          <div class="topbar-actions">
+            <button id="install-app" class="secondary-button hidden" type="button">Instalar</button>
+            <button id="seed-demo" class="secondary-button" type="button">Datos ejemplo</button>
+          </div>
+        </header>
+
+        <section id="dashboard" class="view active-view" aria-labelledby="view-title">
+          <div class="metric-grid">
+            <article class="metric-card">
+              <p>Balance mensual</p>
+              <strong id="metric-balance">S/ 0.00</strong>
+              <span id="metric-income-expense">Ingresos S/ 0.00 · Gastos S/ 0.00</span>
+            </article>
+            <article class="metric-card">
+              <p>Tareas pendientes</p>
+              <strong id="metric-open-tasks">0</strong>
+              <span id="metric-due-tasks">0 para hoy</span>
+            </article>
+            <article class="metric-card">
+              <p>Proxima reunion</p>
+              <strong id="metric-next-meeting">Sin reuniones</strong>
+              <span id="metric-next-meeting-time">Agenda limpia</span>
+            </article>
+            <article class="metric-card">
+              <p>Notas activas</p>
+              <strong id="metric-notes">0</strong>
+              <span>Ideas y seguimiento personal</span>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Prioridad de hoy</h3>
+              </div>
+              <div id="today-tasks" class="item-list empty-space"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Movimiento reciente</h3>
+              </div>
+              <div id="recent-finances" class="item-list empty-space"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Agenda cercana</h3>
+              </div>
+              <div id="upcoming-meetings" class="item-list empty-space"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="finances" class="view" aria-labelledby="view-title">
+          <div class="content-grid">
+            <form id="finance-form" class="panel form-panel">
+              <div class="panel-header">
+                <h3>Nuevo movimiento</h3>
+              </div>
+              <label>
+                Tipo
+                <select name="type">
+                  <option value="income">Ingreso</option>
+                  <option value="expense">Gasto</option>
+                </select>
+              </label>
+              <label>
+                Descripcion
+                <input name="description" required placeholder="Sueldo, comida, transporte..." />
+              </label>
+              <label>
+                Categoria
+                <input name="category" required placeholder="Trabajo, casa, salud..." />
+              </label>
+              <label>
+                Monto
+                <input name="amount" required min="0" step="0.01" type="number" placeholder="0.00" />
+              </label>
+              <label>
+                Fecha
+                <input name="date" required type="date" />
+              </label>
+              <button class="primary-button" type="submit">Guardar movimiento</button>
+            </form>
+            <section class="panel list-panel">
+              <div class="panel-header">
+                <h3>Finanzas</h3>
+                <span id="finance-summary"></span>
+              </div>
+              <div id="finance-list" class="item-list empty-space"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="tasks" class="view" aria-labelledby="view-title">
+          <div class="content-grid">
+            <form id="task-form" class="panel form-panel">
+              <div class="panel-header">
+                <h3>Nueva tarea</h3>
+              </div>
+              <label>
+                Titulo
+                <input name="title" required placeholder="Preparar reporte..." />
+              </label>
+              <label>
+                Area
+                <select name="area">
+                  <option value="Trabajo">Trabajo</option>
+                  <option value="Personal">Personal</option>
+                  <option value="Finanzas">Finanzas</option>
+                  <option value="Casa">Casa</option>
+                </select>
+              </label>
+              <label>
+                Prioridad
+                <select name="priority">
+                  <option value="Alta">Alta</option>
+                  <option value="Media">Media</option>
+                  <option value="Baja">Baja</option>
+                </select>
+              </label>
+              <label>
+                Fecha limite
+                <input name="dueDate" required type="date" />
+              </label>
+              <button class="primary-button" type="submit">Guardar tarea</button>
+            </form>
+            <section class="panel list-panel">
+              <div class="panel-header">
+                <h3>Tareas</h3>
+                <select id="task-filter" aria-label="Filtrar tareas">
+                  <option value="all">Todas</option>
+                  <option value="open">Pendientes</option>
+                  <option value="done">Completadas</option>
+                </select>
+              </div>
+              <div id="task-list" class="item-list empty-space"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="meetings" class="view" aria-labelledby="view-title">
+          <div class="content-grid">
+            <form id="meeting-form" class="panel form-panel">
+              <div class="panel-header">
+                <h3>Nueva reunion</h3>
+              </div>
+              <label>
+                Tema
+                <input name="title" required placeholder="Revision semanal..." />
+              </label>
+              <label>
+                Con quien
+                <input name="people" placeholder="Equipo, cliente, proveedor..." />
+              </label>
+              <label>
+                Fecha
+                <input name="date" required type="date" />
+              </label>
+              <label>
+                Hora
+                <input name="time" required type="time" />
+              </label>
+              <label>
+                Notas
+                <textarea name="notes" rows="4" placeholder="Puntos a tratar"></textarea>
+              </label>
+              <button class="primary-button" type="submit">Guardar reunion</button>
+            </form>
+            <section class="panel list-panel">
+              <div class="panel-header">
+                <h3>Agenda</h3>
+                <span id="meeting-summary"></span>
+              </div>
+              <div id="meeting-list" class="item-list empty-space"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="notes" class="view" aria-labelledby="view-title">
+          <div class="content-grid">
+            <form id="note-form" class="panel form-panel">
+              <div class="panel-header">
+                <h3>Nueva nota</h3>
+              </div>
+              <label>
+                Titulo
+                <input name="title" required placeholder="Idea, pendiente, decision..." />
+              </label>
+              <label>
+                Etiqueta
+                <input name="tag" placeholder="Trabajo, vida, idea..." />
+              </label>
+              <label>
+                Contenido
+                <textarea name="body" required rows="7" placeholder="Escribe lo importante"></textarea>
+              </label>
+              <button class="primary-button" type="submit">Guardar nota</button>
+            </form>
+            <section class="panel list-panel">
+              <div class="panel-header">
+                <h3>Notas</h3>
+                <input id="note-search" class="search-input" placeholder="Buscar" />
+              </div>
+              <div id="note-list" class="item-list empty-space"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

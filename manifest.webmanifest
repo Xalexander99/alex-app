@@ -1,0 +1,17 @@
+{
+  "name": "Alex App",
+  "short_name": "Alex App",
+  "description": "Centro personal para finanzas, tareas, reuniones y notas.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f3ed",
+  "theme_color": "#18211b",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
