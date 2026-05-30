@@ -8,6 +8,16 @@ Abre `index.html` en el navegador. Los datos se guardan en el almacenamiento loc
 
 Para instalarla como app, abre el proyecto desde un servidor local o publicalo en un hosting con HTTPS. El manifest y el service worker ya estan preparados.
 
+## Publicar en Vercel
+
+1. Entra a https://vercel.com/new.
+2. Importa el repositorio `Xalexander99/alex-app`.
+3. Deja el framework como `Other`.
+4. Deja vacios `Build Command` y `Output Directory`.
+5. Pulsa `Deploy`.
+
+La app es estatica, asi que Vercel solo necesita servir estos archivos desde la raiz del proyecto.
+
 ## Funciones actuales
 
 - Dashboard con balance, tareas pendientes, proxima reunion y notas.
