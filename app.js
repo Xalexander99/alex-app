@@ -64,6 +64,14 @@ let chartDonut = null;
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+// ── Security helpers ──
+// Validates CSS color values — only allows safe hex colors or CSS vars
+const HEX_RE = /^#[0-9A-Fa-f]{3,8}$/;
+function safeColor(val, fallback = "#666") {
+  if (typeof val === "string" && (HEX_RE.test(val.trim()) || val.trim().startsWith("var(--"))) return val.trim();
+  return fallback;
+}
+
 // ── Formatters ──
 const formatMoney = (v) => new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(v || 0);
 const formatDate  = (v) => { if (!v) return ""; return new Date(`${v}T00:00:00`).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" }); };
@@ -209,12 +217,12 @@ function renderContextManager() {
     </div>
     <div class="ctx-list" id="ctx-list">
       ${state.contexts.map((c) => `
-        <div class="ctx-row" data-id="${c.id}">
-          <span class="ctx-swatch" style="background:${c.dot}"></span>
-          <input class="ctx-emoji-input" value="${c.emoji}" maxlength="2" data-field="emoji" data-id="${c.id}" />
-          <input class="ctx-label-input" value="${c.label}" data-field="label" data-id="${c.id}" />
+        <div class="ctx-row" data-id="${escapeHTML(c.id)}">
+          <span class="ctx-swatch" style="background:${safeColor(c.dot)}"></span>
+          <input class="ctx-emoji-input" value="${escapeHTML(c.emoji)}" maxlength="2" data-field="emoji" data-id="${escapeHTML(c.id)}" />
+          <input class="ctx-label-input" value="${escapeHTML(c.label)}" data-field="label" data-id="${escapeHTML(c.id)}" />
           <div class="ctx-palette">
-            ${PALETTE.map((p, pi) => `<button class="ctx-color-swatch${c.dot === p.dot ? " selected" : ""}" style="background:${p.dot}" data-palette="${pi}" data-id="${c.id}" type="button"></button>`).join("")}
+            ${PALETTE.map((p, pi) => `<button class="ctx-color-swatch${c.dot === p.dot ? " selected" : ""}" style="background:${safeColor(p.dot)}" data-palette="${pi}" data-id="${escapeHTML(c.id)}" type="button"></button>`).join("")}
           </div>
           <button class="danger-button ctx-delete" data-id="${c.id}" type="button">Eliminar</button>
         </div>`).join("")}
@@ -436,7 +444,7 @@ function renderTaskItem(task) {
   el.dataset.taskId = task.id;
   const ctx = getContextById(task.context);
   const ctxLabel = ctx ? `${ctx.emoji} ${ctx.label}` : "";
-  const ctxStyle = ctx ? `background:${ctx.bg};color:${ctx.color};border:1px solid ${ctx.dot}30` : "";
+  const ctxStyle = ctx ? `background:${safeColor(ctx.bg)};color:${safeColor(ctx.color)};border:1px solid ${safeColor(ctx.dot)}30` : "";
   const attachHTML = (task.attachments || []).map((a) =>
     a.type?.startsWith("image/")
       ? `<a href="${a.dataUrl}" target="_blank"><img src="${a.dataUrl}" class="task-thumb" /></a>`
@@ -486,7 +494,7 @@ function renderMeetingItem(m) {
   el.className = "list-item";
   const ctx = getContextById(m.context);
   const ctxLabel = ctx ? `${ctx.emoji} ${ctx.label}` : "";
-  const ctxStyle = ctx ? `background:${ctx.bg};color:${ctx.color};border:1px solid ${ctx.dot}30` : "";
+  const ctxStyle = ctx ? `background:${safeColor(ctx.bg)};color:${safeColor(ctx.color)};border:1px solid ${safeColor(ctx.dot)}30` : "";
   el.innerHTML = `
     <div class="item-main">
       <div>
@@ -946,8 +954,8 @@ function renderMonthView() {
     const cell = document.createElement("div");
     cell.className = `cal-cell${iso === today ? " cal-today" : ""}`;
     cell.dataset.date = iso;
-    const dots = events.slice(0,3).map((e) => { const c = getEventColor(e); return `<span class="cal-dot" style="background:${c.dot}"></span>`; }).join("");
-    const labels = events.slice(0,2).map((e) => { const c = getEventColor(e); return `<span class="cal-event-label" style="background:${c.bg};color:${c.color}">${escapeHTML(e.label)}</span>`; }).join("");
+    const dots = events.slice(0,3).map((e) => { const c = getEventColor(e); return `<span class="cal-dot" style="background:${safeColor(c.dot)}"></span>`; }).join("");
+    const labels = events.slice(0,2).map((e) => { const c = getEventColor(e); return `<span class="cal-event-label" style="background:${safeColor(c.bg)};color:${safeColor(c.color)}">${escapeHTML(e.label)}</span>`; }).join("");
     const more = events.length > 2 ? `<span class="cal-more">+${events.length-2}</span>` : "";
     cell.innerHTML = `<span class="cal-day-num">${d}</span><div class="cal-dots">${dots}</div><div class="cal-labels">${labels}${more}</div>`;
     grid.appendChild(cell);
@@ -976,7 +984,7 @@ function renderWeekView() {
     col.className = `week-col${isToday ? " week-today" : ""}`;
     col.dataset.date = iso;
     const evHTML = events.length
-      ? events.map((e) => { const c = getEventColor(e); return `<div class="week-event" style="background:${c.bg};border-left-color:${c.dot}">${e.time ? `<span class="week-event-time">${e.time}</span>` : ""}<span class="week-event-title" style="color:${c.color}">${escapeHTML(e.label)}</span></div>`; }).join("")
+      ? events.map((e) => { const c = getEventColor(e); return `<div class="week-event" style="background:${safeColor(c.bg)};border-left-color:${safeColor(c.dot)}">${e.time ? `<span class="week-event-time">${e.time}</span>` : ""}<span class="week-event-title" style="color:${safeColor(c.color)}">${escapeHTML(e.label)}</span></div>`; }).join("")
       : `<p class="week-empty">Sin eventos</p>`;
     col.innerHTML = `<div class="week-col-header"><span class="week-day-name">${dayNames[i]}</span><span class="week-day-num${isToday ? " week-today-num" : ""}">${date.getDate()}</span></div><div class="week-col-events">${evHTML}</div>`;
     grid.appendChild(col);
@@ -996,8 +1004,8 @@ function showDayDetail(date, events) {
       const c = getEventColor(e);
       const ctx = e.kind !== "gcal" ? getContextById(e.context) : null;
       const label = e.kind === "gcal" ? "📅 Google" : (ctx ? `${ctx.emoji} ${ctx.label}` : "");
-      el.style.borderLeft = `3px solid ${c.dot}`;
-      el.innerHTML = `<div class="item-main"><div><p class="item-title">${escapeHTML(e.label)}</p>${e.time ? `<p class="item-meta">${e.time}</p>` : ""}</div>${label ? `<span class="pill" style="background:${c.bg};color:${c.color}">${label}</span>` : ""}</div>`;
+      el.style.borderLeft = `3px solid ${safeColor(c.dot)}`;
+      el.innerHTML = `<div class="item-main"><div><p class="item-title">${escapeHTML(e.label)}</p>${e.time ? `<p class="item-meta">${e.time}</p>` : ""}</div>${label ? `<span class="pill" style="background:${safeColor(c.bg)};color:${safeColor(c.color)}">${escapeHTML(label)}</span>` : ""}</div>`;
       container.appendChild(el);
     });
   }
@@ -1542,7 +1550,19 @@ function bindImportExport() {
     reader.onload = (ev) => {
       try {
         const imported = JSON.parse(ev.target.result);
-        if (imported && typeof imported === "object") {
+        if (imported && typeof imported === "object" && !Array.isArray(imported)) {
+          // Sanitize context colors to prevent CSS injection
+          if (Array.isArray(imported.contexts)) {
+            imported.contexts = imported.contexts.map((c) => ({
+              ...c,
+              dot: safeColor(c.dot, DEFAULT_COLOR.dot),
+              bg: safeColor(c.bg, DEFAULT_COLOR.bg),
+              color: safeColor(c.color, DEFAULT_COLOR.color),
+              label: String(c.label || "").slice(0, 40),
+              emoji: String(c.emoji || "").slice(0, 4),
+              id: String(c.id || uid()).slice(0, 60),
+            }));
+          }
           state = { ...emptyState, ...imported };
           saveState(); render();
           alert("✅ Datos importados correctamente.");
