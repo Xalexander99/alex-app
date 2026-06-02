@@ -1,154 +1,512 @@
+// ── Constants ──
 const STORAGE_KEY = "alex-app-state-v1";
+
+const DEFAULT_CONTEXTS = [
+  { id: "trabajo",  label: "Trabajo",  emoji: "💼", dot: "#e63946", bg: "#2a1215", color: "#ff6b6b" },
+  { id: "personal", label: "Personal", emoji: "🏠", dot: "#4dabf7", bg: "#0d2137", color: "#74c0fc" },
+];
+
+const PALETTE = [
+  { dot: "#e63946", bg: "#2a1215", color: "#ff6b6b" },
+  { dot: "#4dabf7", bg: "#0d2137", color: "#74c0fc" },
+  { dot: "#2ecc71", bg: "#0d2318", color: "#6ee7b7" },
+  { dot: "#f4a261", bg: "#2a1a0d", color: "#fbbf24" },
+  { dot: "#9775fa", bg: "#1a1230", color: "#c084fc" },
+  { dot: "#f472b6", bg: "#2a0d1a", color: "#f9a8d4" },
+  { dot: "#38bdf8", bg: "#0d1f2a", color: "#7dd3fc" },
+  { dot: "#a3e635", bg: "#0f2200", color: "#bef264" },
+];
+
+const GCAL_COLOR  = { bg: "#0d1f3a", color: "#74c0fc", dot: "#4285f4" };
+const DEFAULT_COLOR = { bg: "#1c1c1c", color: "#999", dot: "#666" };
 
 const emptyState = {
   finances: [],
   tasks: [],
   meetings: [],
   notes: [],
+  contexts: DEFAULT_CONTEXTS,
+  gym: [],
+  workLogs: [],
+  goals: [],
+  savings: [],
+  investments: [],
+  jobs: [
+    { id: "job1", name: "", amount: 0, payDay: 15 },
+    { id: "job2", name: "", amount: 0, payDay: 30 },
+  ],
 };
 
 let state = loadState();
 let deferredInstallPrompt = null;
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-const formatMoney = (value) =>
-  new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-  }).format(value || 0);
+// ── Formatters ──
+const formatMoney = (v) => new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(v || 0);
+const formatDate  = (v) => { if (!v) return ""; return new Date(`${v}T00:00:00`).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" }); };
+const todayISO    = () => new Date().toISOString().slice(0, 10);
+const uid         = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const formatDate = (value) => {
-  if (!value) return "";
-  return new Date(`${value}T00:00:00`).toLocaleDateString("es-PE", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const todayISO = () => new Date().toISOString().slice(0, 10);
-const uid = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
+// ── State ──
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? { ...emptyState, ...JSON.parse(saved) } : structuredClone(emptyState);
-  } catch {
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...emptyState, ...parsed, jobs: parsed.jobs || emptyState.jobs };
+    }
     return structuredClone(emptyState);
-  }
+  } catch { return structuredClone(emptyState); }
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  $("#storage-status").textContent = `Guardado local · ${new Date().toLocaleTimeString("es-PE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
+  const el = $("#storage-status");
+  if (el) el.textContent = `Guardado · ${new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}`;
+  renderContextSelects();
+  renderGoalSelects();
 }
 
 function setDefaultDates() {
-  $$('input[type="date"]').forEach((input) => {
-    if (!input.value) input.value = todayISO();
+  $$('input[type="date"]').forEach((i) => { if (!i.value) i.value = todayISO(); });
+}
+
+// ── Views ──
+function switchView(viewId) {
+  $$(".view").forEach((v) => v.classList.toggle("active-view", v.id === viewId));
+  $$(".nav-tab").forEach((t) => t.classList.toggle("active", t.dataset.view === viewId));
+  const titles = {
+    dashboard: "Inicio", finances: "Finanzas", organizer: "Actividades",
+    meetings: "Reuniones", performance: "Metas", calendar: "Calendario",
+  };
+  $("#view-title").textContent = titles[viewId] || viewId;
+  renderContextSelects();
+  renderGoalSelects();
+  if (viewId === "calendar") renderCalendar();
+  if (viewId === "performance") { renderGoals(); renderGym(); renderWorkLog(); }
+  if (viewId === "meetings") { renderMeetings(); renderNotes(); }
+  if (viewId === "organizer") renderTasks();
+}
+
+function switchOrgTab(tabId) {
+  // legacy — no longer used but kept for safety
+  $("#organizer").querySelectorAll(".org-panel").forEach((p) => p.classList.add("hidden"));
+  $("#organizer").querySelectorAll(".org-tab").forEach((t) => t.classList.toggle("active", t.dataset.org === tabId));
+  const el = $(`#org-${tabId}`); if (el) el.classList.remove("hidden");
+}
+
+function switchMeetTab(tabId) {
+  $("#meetings").querySelectorAll(".org-panel").forEach((p) => p.classList.add("hidden"));
+  $("#meetings").querySelectorAll(".org-tab").forEach((t) => t.classList.toggle("active", t.dataset.meet === tabId));
+  $(`#meet-${tabId}`).classList.remove("hidden");
+  if (tabId === "notes") renderNotes();
+  if (tabId === "meetings") renderMeetings();
+}
+
+function switchFinTab(tabId) {
+  $("#finances").querySelectorAll(".org-panel").forEach((p) => p.classList.add("hidden"));
+  $("#finances").querySelectorAll(".org-tab").forEach((t) => t.classList.toggle("active", t.dataset.fin === tabId));
+  $(`#fin-${tabId}`).classList.remove("hidden");
+}
+
+function switchPerfTab(tabId) {
+  $("#performance").querySelectorAll(".org-panel").forEach((p) => p.classList.add("hidden"));
+  $("#performance").querySelectorAll(".org-tab").forEach((t) => t.classList.toggle("active", t.dataset.perf === tabId));
+  $(`#perf-${tabId}`).classList.remove("hidden");
+  if (tabId === "stats") { renderGym(); renderWorkLog(); }
+  if (tabId === "goals") renderGoals();
+}
+
+// ── Contexts ──
+function getContextById(id) { return state.contexts.find((c) => c.id === id) || null; }
+
+function getEventColor(ev) {
+  if (ev.kind === "gcal") return GCAL_COLOR;
+  const ctx = getContextById(ev.context);
+  return ctx ? { bg: ctx.bg, color: ctx.color, dot: ctx.dot } : DEFAULT_COLOR;
+}
+
+function renderContextSelects() {
+  const opts = state.contexts.map((c) => `<option value="${c.id}">${c.emoji} ${c.label}</option>`).join("");
+  $$("select[name='context']").forEach((sel) => {
+    const cur = sel.value;
+    sel.innerHTML = opts;
+    if (cur && sel.querySelector(`option[value="${cur}"]`)) sel.value = cur;
   });
 }
 
-function switchView(viewId) {
-  $$(".view").forEach((view) => view.classList.toggle("active-view", view.id === viewId));
-  $$(".nav-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === viewId));
-  $("#view-title").textContent = {
-    dashboard: "Inicio",
-    finances: "Finanzas",
-    tasks: "Tareas",
-    meetings: "Reuniones",
-    notes: "Notas",
-  }[viewId];
+function renderGoalSelects() {
+  const goals = state.goals || [];
+  const noLink = `<option value="">Sin meta</option>`;
+  const noLinkAll = `<option value="all">Todas las metas</option>`;
+  const opts = goals.map((g) => {
+    const cat = CAT_CONFIG[g.category || g.type] || {};
+    return `<option value="${g.id}">${g.emoji || "🎯"} ${escapeHTML(g.title)}</option>`;
+  }).join("");
+
+  // Task form link dropdown
+  const taskGoalSel = $("#task-goal-select");
+  if (taskGoalSel) { const cur = taskGoalSel.value; taskGoalSel.innerHTML = noLink + opts; if (cur) taskGoalSel.value = cur; }
+
+  // Task list filter dropdown
+  const taskGoalFilter = $("#task-goal-filter");
+  if (taskGoalFilter) { const cur = taskGoalFilter.value; taskGoalFilter.innerHTML = noLinkAll + opts; if (cur) taskGoalFilter.value = cur; }
 }
 
-function render() {
-  renderDashboard();
-  renderFinances();
-  renderTasks();
-  renderMeetings();
-  renderNotes();
+function renderCalFilters() {
+  const bar = $("#cal-filters");
+  bar.innerHTML = `
+    <span class="cal-filter-label">Ver:</span>
+    <button class="cal-filter${calFilter === "all" ? " active" : ""}" data-ctx="all">Todos</button>
+    ${state.contexts.map((c) => `<button class="cal-filter${calFilter === c.id ? " active" : ""}" data-ctx="${c.id}">${c.emoji} ${c.label}</button>`).join("")}
+    ${gcalIsConnected() ? `<button class="cal-filter${calFilter === "gcal" ? " active" : ""}" data-ctx="gcal">🔵 Google</button>` : ""}
+    <button class="cal-filter-manage" id="btn-manage-ctx" type="button">⚙️ Gestionar</button>`;
+
+  $$(".cal-filter").forEach((btn) => btn.addEventListener("click", () => {
+    $$(".cal-filter").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    calFilter = btn.dataset.ctx;
+    renderCalendar();
+  }));
+
+  $("#btn-manage-ctx").addEventListener("click", () => {
+    const p = $("#ctx-manager");
+    p.classList.toggle("hidden");
+    if (!p.classList.contains("hidden")) renderContextManager();
+  });
 }
 
+function renderContextManager() {
+  const panel = $("#ctx-manager");
+  panel.innerHTML = `
+    <div class="ctx-manager-header">
+      <h3>Gestionar contextos</h3>
+      <button class="secondary-button" id="ctx-close" type="button">Cerrar</button>
+    </div>
+    <div class="ctx-list" id="ctx-list">
+      ${state.contexts.map((c) => `
+        <div class="ctx-row" data-id="${c.id}">
+          <span class="ctx-swatch" style="background:${c.dot}"></span>
+          <input class="ctx-emoji-input" value="${c.emoji}" maxlength="2" data-field="emoji" data-id="${c.id}" />
+          <input class="ctx-label-input" value="${c.label}" data-field="label" data-id="${c.id}" />
+          <div class="ctx-palette">
+            ${PALETTE.map((p, pi) => `<button class="ctx-color-swatch${c.dot === p.dot ? " selected" : ""}" style="background:${p.dot}" data-palette="${pi}" data-id="${c.id}" type="button"></button>`).join("")}
+          </div>
+          <button class="danger-button ctx-delete" data-id="${c.id}" type="button">Eliminar</button>
+        </div>`).join("")}
+    </div>
+    <div class="ctx-add-row">
+      <input id="ctx-new-emoji" placeholder="🏷️" maxlength="2" class="ctx-emoji-input" />
+      <input id="ctx-new-label" placeholder="Nuevo contexto..." class="ctx-label-input" />
+      <button class="primary-button" id="ctx-add-btn" type="button">+ Agregar</button>
+    </div>`;
+
+  $("#ctx-close").addEventListener("click", () => panel.classList.add("hidden"));
+
+  panel.querySelectorAll("[data-field]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const ctx = state.contexts.find((c) => c.id === input.dataset.id);
+      if (ctx) { ctx[input.dataset.field] = input.value; saveState(); renderCalFilters(); renderCalendar(); }
+    });
+  });
+
+  panel.querySelectorAll(".ctx-color-swatch").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const ctx = state.contexts.find((c) => c.id === btn.dataset.id);
+      const p = PALETTE[btn.dataset.palette];
+      if (ctx && p) { Object.assign(ctx, p); saveState(); renderContextManager(); renderCalFilters(); renderCalendar(); }
+    });
+  });
+
+  panel.querySelectorAll(".ctx-delete").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (state.contexts.length <= 1) { alert("Debe quedar al menos un contexto."); return; }
+      state.contexts = state.contexts.filter((c) => c.id !== btn.dataset.id);
+      saveState(); renderContextManager(); renderCalFilters(); renderCalendar();
+    });
+  });
+
+  $("#ctx-add-btn").addEventListener("click", () => {
+    const emoji = $("#ctx-new-emoji").value.trim() || "🏷️";
+    const label = $("#ctx-new-label").value.trim();
+    if (!label) return;
+    const p = PALETTE[state.contexts.length % PALETTE.length];
+    state.contexts.push({ id: uid(), label, emoji, ...p });
+    saveState(); renderContextManager(); renderCalFilters(); renderCalendar();
+    $("#ctx-new-label").value = ""; $("#ctx-new-emoji").value = "";
+  });
+}
+
+// ── Escaping ──
+function escapeHTML(v) {
+  return String(v || "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
+}
+
+// ── Render helpers ──
+function renderList(selector, items, renderer, emptyMsg) {
+  const el = $(selector);
+  el.innerHTML = "";
+  if (!items.length) { el.innerHTML = `<p class="empty-message">${emptyMsg}</p>`; return; }
+  items.forEach((item) => el.appendChild(renderer(item)));
+}
+
+// ── Dashboard ──
 function renderDashboard() {
-  const income = state.finances.filter((item) => item.type === "income").reduce((sum, item) => sum + item.amount, 0);
-  const expenses = state.finances.filter((item) => item.type === "expense").reduce((sum, item) => sum + item.amount, 0);
-  const openTasks = state.tasks.filter((task) => !task.done);
-  const todayTasks = openTasks.filter((task) => task.dueDate <= todayISO()).sort(sortTasks);
-  const upcomingMeetings = state.meetings
-    .filter((meeting) => `${meeting.date}T${meeting.time}` >= new Date().toISOString().slice(0, 16))
-    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  const nextMeeting = upcomingMeetings[0];
+  const income = state.finances.filter((i) => i.type === "income").reduce((s, i) => s + i.amount, 0);
+  const expenses = state.finances.filter((i) => i.type === "expense").reduce((s, i) => s + i.amount, 0);
+  const jobIncome = (state.jobs || []).reduce((s, j) => s + (Number(j.amount) || 0), 0);
+  const totalIncome = income + jobIncome;
+  const openTasks = state.tasks.filter((t) => !t.done);
+  const todayTasks = openTasks.filter((t) => t.dueDate <= todayISO()).sort(sortTasks);
 
-  $("#metric-balance").textContent = formatMoney(income - expenses);
-  $("#metric-income-expense").textContent = `Ingresos ${formatMoney(income)} · Gastos ${formatMoney(expenses)}`;
+  // Gym streak
+  const streak = calcGymStreak();
+  const gymWeekDays = gymDaysThisWeek();
+
+  // Goals
+  const activeGoals = (state.goals || []).filter((g) => Number(g.current) < Number(g.target));
+
+  $("#metric-balance").textContent = formatMoney(totalIncome - expenses);
+  $("#metric-income-expense").textContent = `Ingresos ${formatMoney(totalIncome)} · Gastos ${formatMoney(expenses)}`;
   $("#metric-open-tasks").textContent = openTasks.length;
   $("#metric-due-tasks").textContent = `${todayTasks.length} para hoy o vencidas`;
-  $("#metric-next-meeting").textContent = nextMeeting ? nextMeeting.title : "Sin reuniones";
-  $("#metric-next-meeting-time").textContent = nextMeeting ? `${formatDate(nextMeeting.date)} · ${nextMeeting.time}` : "Agenda limpia";
-  $("#metric-notes").textContent = state.notes.length;
+  $("#metric-gym-streak").textContent = `${streak} días`;
+  $("#metric-gym-week").textContent = `Esta semana: ${gymWeekDays} días`;
+  $("#metric-goals").textContent = activeGoals.length;
+  $("#metric-goals-sub").textContent = activeGoals.length ? `${activeGoals[0].emoji || "🎯"} ${activeGoals[0].title}` : "Sin metas activas";
 
   renderList("#today-tasks", todayTasks.slice(0, 5), renderTaskItem, "No hay tareas urgentes.");
-  renderList("#recent-finances", [...state.finances].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5), renderFinanceItem, "Aun no hay movimientos.");
-  renderList("#upcoming-meetings", upcomingMeetings.slice(0, 5), renderMeetingItem, "No hay reuniones proximas.");
+  renderList("#recent-finances", [...state.finances].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5), renderFinanceItem, "Sin movimientos.");
+
+  const goalsEl = $("#dash-goals");
+  goalsEl.innerHTML = "";
+  if (!activeGoals.length) { goalsEl.innerHTML = `<p class="empty-message">Sin metas activas.</p>`; }
+  else {
+    activeGoals.slice(0, 4).forEach((g) => {
+      const gcurrent = calcLinkedProgress(g);
+      const pct = Math.min(100, Math.round((gcurrent / Number(g.target)) * 100));
+      const div = document.createElement("div");
+      div.className = "list-item";
+      div.innerHTML = `
+        <div class="item-main">
+          <p class="item-title">${g.emoji || "🎯"} ${escapeHTML(g.title)}</p>
+          <span class="item-meta">${pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <p class="item-meta">${escapeHTML(String(gcurrent))} / ${escapeHTML(String(g.target))} ${escapeHTML(g.unit)}</p>`;
+      goalsEl.appendChild(div);
+    });
+  }
 }
 
+// ── Finances ──
 function renderFinances() {
-  const income = state.finances.filter((item) => item.type === "income").reduce((sum, item) => sum + item.amount, 0);
-  const expenses = state.finances.filter((item) => item.type === "expense").reduce((sum, item) => sum + item.amount, 0);
-  $("#finance-summary").textContent = `${formatMoney(income - expenses)} disponible`;
-  renderList(
-    "#finance-list",
-    [...state.finances].sort((a, b) => b.date.localeCompare(a.date)),
-    renderFinanceItem,
-    "Registra ingresos y gastos para ver tu balance."
-  );
+  const job1 = state.jobs?.[0] || {};
+  const job2 = state.jobs?.[1] || {};
+  const extras = state.finances.filter((i) => i.type === "income" && i.subtype === "extra");
+  const expenses = state.finances.filter((i) => i.type === "expense");
+
+  const totalJob1 = Number(job1.amount) || 0;
+  const totalJob2 = Number(job2.amount) || 0;
+  const totalExtra = extras.reduce((s, i) => s + i.amount, 0);
+  const totalExpense = expenses.reduce((s, i) => s + i.amount, 0);
+  const totalIncome = totalJob1 + totalJob2 + totalExtra;
+
+  // Jobs display
+  if (job1.name || job1.amount) {
+    $("#job1-name").value = job1.name || "";
+    $("#job1-amount").value = job1.amount || "";
+    $("#job1-payday").value = job1.payDay || "";
+    $("#job1-display").innerHTML = job1.name ? `<div class="list-item"><div class="item-main"><p class="item-title">${escapeHTML(job1.name)}</p><span class="amount-income">${formatMoney(job1.amount)}</span></div><p class="item-meta">Día de pago: ${job1.payDay || "—"}</p></div>` : "";
+  }
+  if (job2.name || job2.amount) {
+    $("#job2-name").value = job2.name || "";
+    $("#job2-amount").value = job2.amount || "";
+    $("#job2-payday").value = job2.payDay || "";
+    $("#job2-display").innerHTML = job2.name ? `<div class="list-item"><div class="item-main"><p class="item-title">${escapeHTML(job2.name)}</p><span class="amount-income">${formatMoney(job2.amount)}</span></div><p class="item-meta">Día de pago: ${job2.payDay || "—"}</p></div>` : "";
+  }
+
+  $("#job1-summary").textContent = formatMoney(totalJob1);
+  $("#job2-summary").textContent = formatMoney(totalJob2);
+  $("#extra-summary").textContent = formatMoney(totalExtra);
+  $("#expense-summary").textContent = `Total: ${formatMoney(totalExpense)}`;
+  $("#income-total").textContent = formatMoney(totalIncome);
+
+  renderList("#extra-list", [...extras].sort((a, b) => b.date.localeCompare(a.date)), renderFinanceItem, "Sin ingresos extras.");
+  renderList("#expense-list", [...expenses].sort((a, b) => b.date.localeCompare(a.date)), renderFinanceItem, "Sin gastos registrados.");
+
+  // Savings
+  renderSavings();
+  // Investments
+  renderInvestments();
 }
 
+function renderSavings() {
+  const list = $("#savings-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!(state.savings || []).length) { list.innerHTML = `<p class="empty-message">Sin metas de ahorro.</p>`; return; }
+  state.savings.forEach((s) => {
+    const pct = Math.min(100, Math.round((Number(s.current) / Number(s.target)) * 100));
+    const div = document.createElement("div");
+    div.className = "savings-goal";
+    div.innerHTML = `
+      <div class="item-main">
+        <div>
+          <p class="savings-name">${s.emoji || "🏦"} ${escapeHTML(s.name)}</p>
+          ${s.deadline ? `<p class="item-meta">Límite: ${formatDate(s.deadline)}</p>` : ""}
+        </div>
+        <button class="danger-button" data-delete-saving="${s.id}" type="button">✕</button>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="savings-meta">
+        <span>Progreso: <strong>${formatMoney(s.current)}</strong></span>
+        <span>Meta: <strong>${formatMoney(s.target)}</strong> · ${pct}%</span>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function renderInvestments() {
+  const list = $("#investment-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!(state.investments || []).length) { list.innerHTML = `<p class="empty-message">Sin inversiones registradas.</p>`; return; }
+  state.investments.forEach((inv) => {
+    const div = document.createElement("div");
+    div.className = "investment-card";
+    div.innerHTML = `
+      <div>
+        <p class="investment-name">${escapeHTML(inv.name)}</p>
+        <p class="investment-meta">${escapeHTML(inv.type)} · ${formatDate(inv.date)}</p>
+        ${inv.notes ? `<p class="investment-meta">${escapeHTML(inv.notes)}</p>` : ""}
+      </div>
+      <div style="text-align:right">
+        <p class="investment-amount">${formatMoney(inv.amount)}</p>
+        <button class="danger-button" data-delete-inv="${inv.id}" style="margin-top:6px" type="button">✕</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+// ── Tasks ──
 function renderTasks() {
-  const filter = $("#task-filter").value;
+  const filter = $("#task-filter")?.value || "all";
+  const goalFilter = $("#task-goal-filter")?.value || "all";
   let tasks = [...state.tasks].sort(sortTasks);
-  if (filter === "open") tasks = tasks.filter((task) => !task.done);
-  if (filter === "done") tasks = tasks.filter((task) => task.done);
-  renderList("#task-list", tasks, renderTaskItem, "Crea tareas para organizar trabajo y vida personal.");
+  if (filter === "open") tasks = tasks.filter((t) => !t.done);
+  if (filter === "done") tasks = tasks.filter((t) => t.done);
+  if (goalFilter !== "all") tasks = tasks.filter((t) => t.goalId === goalFilter);
+  renderList("#task-list", tasks, renderTaskItem, "Sin tareas. Agrega una o crea una desde una meta.");
 }
 
+function sortTasks(a, b) {
+  const p = { Alta: 0, Media: 1, Baja: 2 };
+  return (a.done ? 1 : 0) - (b.done ? 1 : 0) || (a.dueDate || "").localeCompare(b.dueDate || "") || (p[a.priority] || 1) - (p[b.priority] || 1);
+}
+
+function renderTaskItem(task) {
+  const el = document.createElement("article");
+  el.className = `list-item ${task.done ? "done" : ""}`;
+  const ctx = getContextById(task.context);
+  const ctxLabel = ctx ? `${ctx.emoji} ${ctx.label}` : "";
+  const ctxStyle = ctx ? `background:${ctx.bg};color:${ctx.color};border:1px solid ${ctx.dot}30` : "";
+  const attachHTML = (task.attachments || []).map((a) =>
+    a.type?.startsWith("image/")
+      ? `<a href="${a.dataUrl}" target="_blank"><img src="${a.dataUrl}" class="task-thumb" /></a>`
+      : `<a href="${a.dataUrl}" download="${escapeHTML(a.name)}" class="file-chip-sm">📄 ${escapeHTML(a.name)}</a>`
+  ).join("");
+  // Goal badge
+  const linkedGoal = task.goalId ? (state.goals || []).find((g) => g.id === task.goalId) : null;
+  const goalBadge = linkedGoal ? `<span class="task-goal-badge">🎯 ${escapeHTML(linkedGoal.title)}</span>` : "";
+
+  el.innerHTML = `
+    <div class="item-main">
+      <div>
+        <p class="item-title">${escapeHTML(task.title)}</p>
+        <p class="item-meta">${formatDate(task.dueDate)}</p>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        ${ctxLabel ? `<span class="pill" style="${ctxStyle}">${ctxLabel}</span>` : ""}
+        ${goalBadge}
+      </div>
+    </div>
+    ${task.body ? `<p class="item-meta task-body">${escapeHTML(task.body)}</p>` : ""}
+    ${attachHTML ? `<div class="task-attachments">${attachHTML}</div>` : ""}
+    <div class="item-actions">
+      <button class="secondary-button" data-toggle-task="${task.id}" type="button">${task.done ? "Reabrir" : "Completar"}</button>
+      <button class="danger-button" data-delete="tasks" data-id="${task.id}" type="button">Eliminar</button>
+    </div>`;
+  return el;
+}
+
+// ── Meetings ──
 function renderMeetings() {
   const sorted = [...state.meetings].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  $("#meeting-summary").textContent = `${sorted.length} registradas`;
-  renderList("#meeting-list", sorted, renderMeetingItem, "Agenda reuniones y guarda notas clave.");
+  const el = $("#meeting-summary");
+  if (el) el.textContent = `${sorted.length} registradas`;
+  renderList("#meeting-list", sorted, renderMeetingItem, "Agenda reuniones importantes.");
 }
 
+function renderMeetingItem(m) {
+  const el = document.createElement("article");
+  el.className = "list-item";
+  const ctx = getContextById(m.context);
+  const ctxLabel = ctx ? `${ctx.emoji} ${ctx.label}` : "";
+  const ctxStyle = ctx ? `background:${ctx.bg};color:${ctx.color};border:1px solid ${ctx.dot}30` : "";
+  el.innerHTML = `
+    <div class="item-main">
+      <div>
+        <p class="item-title">${escapeHTML(m.title)}</p>
+        <p class="item-meta">${formatDate(m.date)} · ${m.time} · ${escapeHTML(m.people || "")}</p>
+      </div>
+      ${ctxLabel ? `<span class="pill" style="${ctxStyle}">${ctxLabel}</span>` : ""}
+    </div>
+    ${m.notes ? `<p class="item-meta">${escapeHTML(m.notes)}</p>` : ""}
+    <div class="item-actions">
+      <button class="danger-button" data-delete="meetings" data-id="${m.id}" type="button">Eliminar</button>
+    </div>`;
+  return el;
+}
+
+// ── Notes ──
 function renderNotes() {
-  const query = $("#note-search").value.trim().toLowerCase();
+  const query = ($("#note-search")?.value || "").trim().toLowerCase();
   const notes = [...state.notes]
-    .filter((note) => `${note.title} ${note.tag} ${note.body}`.toLowerCase().includes(query))
+    .filter((n) => `${n.title} ${n.tag} ${n.body}`.toLowerCase().includes(query))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   renderList("#note-list", notes, renderNoteItem, "Guarda ideas, decisiones y seguimiento.");
 }
 
-function renderList(selector, items, renderer, emptyMessage) {
-  const container = $(selector);
-  container.innerHTML = "";
-  if (!items.length) {
-    container.innerHTML = `<p class="empty-message">${emptyMessage}</p>`;
-    return;
-  }
-  items.forEach((item) => container.appendChild(renderer(item)));
+function renderNoteItem(note) {
+  const el = document.createElement("article");
+  el.className = "list-item";
+  el.innerHTML = `
+    <div class="item-main">
+      <div>
+        <p class="item-title">${escapeHTML(note.title)}</p>
+        <p class="item-meta">${escapeHTML(note.tag || "Sin etiqueta")} · ${new Date(note.createdAt).toLocaleDateString("es-PE")}</p>
+      </div>
+      ${note.tag ? `<span class="pill">${escapeHTML(note.tag)}</span>` : ""}
+    </div>
+    <p class="item-meta task-body">${escapeHTML(note.body)}</p>
+    <div class="item-actions">
+      <button class="danger-button" data-delete="notes" data-id="${note.id}" type="button">Eliminar</button>
+    </div>`;
+  return el;
 }
 
+// ── Finance item ──
 function renderFinanceItem(item) {
-  const element = document.createElement("article");
-  element.className = "list-item";
-  element.innerHTML = `
+  const el = document.createElement("article");
+  el.className = "list-item";
+  el.innerHTML = `
     <div class="item-main">
       <div>
         <p class="item-title">${escapeHTML(item.description)}</p>
-        <p class="item-meta">${escapeHTML(item.category)} · ${formatDate(item.date)}</p>
+        <p class="item-meta">${escapeHTML(item.category || "")} · ${formatDate(item.date)}</p>
       </div>
       <span class="${item.type === "income" ? "amount-income" : "amount-expense"}">
         ${item.type === "income" ? "+" : "-"}${formatMoney(item.amount)}
@@ -156,213 +514,915 @@ function renderFinanceItem(item) {
     </div>
     <div class="item-actions">
       <button class="danger-button" data-delete="finances" data-id="${item.id}" type="button">Eliminar</button>
-    </div>
-  `;
-  return element;
+    </div>`;
+  return el;
 }
 
-function renderTaskItem(task) {
-  const element = document.createElement("article");
-  element.className = `list-item ${task.done ? "done" : ""}`;
-  element.innerHTML = `
-    <div class="item-main">
-      <div>
-        <p class="item-title">${escapeHTML(task.title)}</p>
-        <p class="item-meta">${escapeHTML(task.area)} · ${formatDate(task.dueDate)}</p>
+// ══ GYM ══
+function gymDaysThisWeek() {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  const weekStart = startOfWeek.toISOString().slice(0, 10);
+  const weekEnd = todayISO();
+  return (state.gym || []).filter((d) => d.date >= weekStart && d.date <= weekEnd).length;
+}
+
+function calcGymStreak() {
+  const dates = new Set((state.gym || []).map((d) => d.date));
+  let streak = 0;
+  let d = new Date();
+  while (true) {
+    const iso = d.toISOString().slice(0, 10);
+    if (dates.has(iso)) { streak++; d.setDate(d.getDate() - 1); }
+    else break;
+  }
+  return streak;
+}
+
+function renderGym() {
+  const streak = calcGymStreak();
+  const weekDays = gymDaysThisWeek();
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthDates = new Set((state.gym || []).map((d) => d.date));
+  const monthCount = [...monthDates].filter((d) => d.startsWith(`${year}-${String(month+1).padStart(2,"0")}`)).length;
+
+  const s = $("#gym-streak"); if (s) s.textContent = streak;
+  const w = $("#gym-week");   if (w) w.textContent = weekDays;
+  const m = $("#gym-month");  if (m) m.textContent = monthCount;
+
+  const cal = $("#gym-calendar");
+  if (!cal) return;
+  cal.innerHTML = "";
+  const firstDay = new Date(year, month, 1).getDay();
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement("div");
+    cal.appendChild(empty);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const went = monthDates.has(iso);
+    const isToday = iso === todayISO();
+    const div = document.createElement("div");
+    div.className = `gym-day${went ? " went" : ""}${isToday ? " today" : ""}`;
+    div.dataset.date = iso;
+    div.innerHTML = `<span class="gym-day-num">${d}</span>${went ? '<span class="gym-check">✓</span>' : ""}`;
+    cal.appendChild(div);
+  }
+
+  renderList("#gym-list", [...(state.gym || [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10),
+    (g) => {
+      const el = document.createElement("div");
+      el.className = "list-item";
+      el.innerHTML = `<div class="item-main"><p class="item-title">✓ ${formatDate(g.date)}</p>${g.note ? `<p class="item-meta">${escapeHTML(g.note)}</p>` : ""}<button class="danger-button" data-delete-gym="${g.id}" type="button">✕</button></div>`;
+      return el;
+    }, "Sin registros de gym.");
+}
+
+// ── Work Log ──
+function renderWorkLog() {
+  const logs = state.workLogs || [];
+  const now = new Date();
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-01`;
+
+  const hoursWeek  = logs.filter((l) => l.date >= weekStart.toISOString().slice(0,10)).reduce((s,l) => s + Number(l.hours), 0);
+  const hoursMonth = logs.filter((l) => l.date >= monthStart).reduce((s,l) => s + Number(l.hours), 0);
+  const sessMonth  = logs.filter((l) => l.date >= monthStart).length;
+
+  const hw = $("#work-hours-week");  if (hw) hw.textContent = `${hoursWeek}h`;
+  const hm = $("#work-hours-month"); if (hm) hm.textContent = `${hoursMonth}h`;
+  const sm = $("#work-sessions");    if (sm) sm.textContent = sessMonth;
+
+  renderList("#worklog-list", [...logs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15),
+    (l) => {
+      const el = document.createElement("div");
+      el.className = "list-item";
+      el.innerHTML = `<div class="item-main"><div><p class="item-title">${escapeHTML(l.project)}</p><p class="item-meta">${formatDate(l.date)}${l.notes ? ` · ${escapeHTML(l.notes)}` : ""}</p></div><span class="pill">${l.hours}h</span></div>
+        <div class="item-actions"><button class="danger-button" data-delete-log="${l.id}" type="button">Eliminar</button></div>`;
+      return el;
+    }, "Sin sesiones registradas.");
+}
+
+// ── Linked goal progress ──
+function calcLinkedProgress(goal) {
+  if (!goal.linkedTo) return Number(goal.current);
+  if (goal.linkedTo === "gym_days") {
+    return (state.gym || []).length;
+  }
+  if (goal.linkedTo === "work_hours") {
+    return (state.workLogs || []).reduce((s, l) => s + Number(l.hours), 0);
+  }
+  if (goal.linkedTo === "work_sessions") {
+    return (state.workLogs || []).length;
+  }
+  return Number(goal.current);
+}
+
+// ── Repetitive goal auto-renewal ──
+function calcNextDeadline(frequency, fromDate) {
+  const d = new Date(`${fromDate}T00:00:00`);
+  if (frequency === "semanal")   d.setDate(d.getDate() + 7);
+  else if (frequency === "quincenal") d.setDate(d.getDate() + 15);
+  else if (frequency === "mensual")   d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function checkRepetitiveGoals() {
+  const today = todayISO();
+  let changed = false;
+  (state.goals || []).forEach((g) => {
+    if (!g.repetitive || !g.deadline || g.frequency === "unica") return;
+    if (today > g.deadline) {
+      // Archive current period as a log (optional: could store history)
+      g.deadline = calcNextDeadline(g.frequency, g.deadline);
+      g.current = 0; // reset progress
+      // Reset linked tasks completion
+      (state.tasks || []).filter((t) => t.goalId === g.id).forEach((t) => { t.done = false; });
+      changed = true;
+    }
+  });
+  if (changed) saveState();
+}
+
+function renderLinkedGoals(containerId, linkTypes) {
+  const el = $(containerId);
+  if (!el) return;
+  const linked = (state.goals || []).filter((g) => linkTypes.includes(g.linkedTo));
+  el.innerHTML = "";
+  if (!linked.length) {
+    el.innerHTML = `<p class="empty-message">Sin metas vinculadas. Crea una meta y elige "Vincular con".</p>`;
+    return;
+  }
+  linked.forEach((g) => {
+    const current = calcLinkedProgress(g);
+    const pct = Math.min(100, Math.round((current / Number(g.target)) * 100));
+    const done = pct >= 100;
+    const div = document.createElement("div");
+    div.className = `linked-goal-card${done ? " goal-done" : ""}`;
+    div.innerHTML = `
+      <div class="item-main">
+        <div>
+          <p class="item-title">${g.emoji || "🎯"} ${escapeHTML(g.title)}</p>
+          <p class="item-meta">${done ? "✅ ¡Meta completada!" : `${current} / ${g.target} ${escapeHTML(g.unit)}`}</p>
+        </div>
+        <span class="pill" style="${done ? "background:#0d2318;color:#2ecc71;border:1px solid #2ecc7133" : ""}">${pct}%</span>
       </div>
-      <span class="pill ${task.priority === "Alta" ? "warn" : "blue"}">${escapeHTML(task.priority)}</span>
-    </div>
-    <div class="item-actions">
-      <button class="secondary-button" data-toggle-task="${task.id}" type="button">${task.done ? "Reabrir" : "Completar"}</button>
-      <button class="danger-button" data-delete="tasks" data-id="${task.id}" type="button">Eliminar</button>
-    </div>
-  `;
-  return element;
-}
-
-function renderMeetingItem(meeting) {
-  const element = document.createElement("article");
-  element.className = "list-item";
-  element.innerHTML = `
-    <div class="item-main">
-      <div>
-        <p class="item-title">${escapeHTML(meeting.title)}</p>
-        <p class="item-meta">${formatDate(meeting.date)} · ${meeting.time} · ${escapeHTML(meeting.people || "Sin participantes")}</p>
-      </div>
-      <span class="pill blue">Agenda</span>
-    </div>
-    ${meeting.notes ? `<p class="item-meta">${escapeHTML(meeting.notes)}</p>` : ""}
-    <div class="item-actions">
-      <button class="danger-button" data-delete="meetings" data-id="${meeting.id}" type="button">Eliminar</button>
-    </div>
-  `;
-  return element;
-}
-
-function renderNoteItem(note) {
-  const element = document.createElement("article");
-  element.className = "list-item";
-  element.innerHTML = `
-    <div class="item-main">
-      <div>
-        <p class="item-title">${escapeHTML(note.title)}</p>
-        <p class="item-meta">${escapeHTML(note.tag || "Sin etiqueta")} · ${new Date(note.createdAt).toLocaleDateString("es-PE")}</p>
-      </div>
-      <span class="pill">${escapeHTML(note.tag || "Nota")}</span>
-    </div>
-    <p class="item-meta">${escapeHTML(note.body)}</p>
-    <div class="item-actions">
-      <button class="danger-button" data-delete="notes" data-id="${note.id}" type="button">Eliminar</button>
-    </div>
-  `;
-  return element;
-}
-
-function sortTasks(a, b) {
-  const priority = { Alta: 0, Media: 1, Baja: 2 };
-  return a.done - b.done || a.dueDate.localeCompare(b.dueDate) || priority[a.priority] - priority[b.priority];
-}
-
-function escapeHTML(value) {
-  return String(value || "").replace(/[&<>"']/g, (char) => {
-    return {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;",
-    }[char];
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;${done ? "background:var(--green)" : ""}"></div></div>
+      ${g.deadline ? `<p class="item-meta">Límite: ${formatDate(g.deadline)}</p>` : ""}`;
+    el.appendChild(div);
   });
 }
 
-function handleSubmit(formId, collection, mapper) {
-  $(formId).addEventListener("submit", (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = Object.fromEntries(new FormData(form).entries());
-    state[collection].push({ id: uid(), ...mapper(formData) });
-    form.reset();
-    setDefaultDates();
-    saveState();
-    render();
+// ── Goals ──
+const CAT_CONFIG = {
+  ejercicio:  { label: "💪 Ejercicio",  color: "#e63946" },
+  trabajo:    { label: "🧠 Trabajo",    color: "#4dabf7" },
+  personal:   { label: "🏠 Personal",   color: "#f4a261" },
+  financiero: { label: "💰 Financiero", color: "#2ecc71" },
+  // backward compat
+  financiera: { label: "💰 Financiero", color: "#2ecc71" },
+};
+
+function renderGoals() {
+  const container = $("#goals-list");
+  if (!container) return;
+  container.innerHTML = "";
+  let goals = state.goals || [];
+  if (goalCatFilter !== "all") {
+    goals = goals.filter((g) => (g.category || g.type) === goalCatFilter);
+  }
+  if (!goals.length) {
+    container.innerHTML = `<p class="empty-message">${goalCatFilter === "all" ? "Crea tu primera meta arriba." : "Sin metas en esta categoría."}</p>`;
+    return;
+  }
+
+  goals.forEach((g) => {
+    const current = calcLinkedProgress(g);
+    const pct = Math.min(100, Math.round((current / Number(g.target)) * 100));
+    const done = pct >= 100;
+    const cat = g.category || g.type || "personal";
+    const catInfo = CAT_CONFIG[cat] || { label: cat, color: "#999" };
+    const linkedTasks = (state.tasks || []).filter((t) => t.goalId === g.id);
+
+    const card = document.createElement("div");
+    card.className = `goal-card${done ? " goal-done" : ""}`;
+    card.innerHTML = `
+      <div class="goal-header">
+        <div>
+          <span class="goal-cat-badge" style="color:${catInfo.color}">${catInfo.label}${g.linkedTo ? " · 🔗 Auto" : ""}${g.repetitive ? " · 🔄 Repetitiva" : ""}</span>
+          <p class="goal-title">${escapeHTML(g.title)}</p>
+          ${g.frequency && g.frequency !== "unica" ? `<p class="item-meta goal-freq-badge">${{ semanal:"Semanal", quincenal:"Quincenal", mensual:"Mensual" }[g.frequency] || g.frequency}</p>` : ""}
+          ${g.deadline ? `<p class="item-meta">📅 ${g.repetitive ? "Renovación:" : "Límite:"} ${formatDate(g.deadline)}</p>` : ""}
+        </div>
+        ${done ? `<span class="goal-done-badge">✅ Completada</span>` : ""}
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;${done ? "background:var(--green)" : ""}"></div></div>
+      <div class="goal-progress-text">
+        <span><strong>${current}</strong> ${escapeHTML(g.unit)}</span>
+        <span>${pct}% · meta <strong>${escapeHTML(String(g.target))}</strong> ${escapeHTML(g.unit)}</span>
+      </div>
+
+      <div class="goal-activities">
+        <div class="goal-activities-header">
+          <span class="goal-activities-title">Actividades (${linkedTasks.length})</span>
+          <button class="goal-add-task-btn" data-goal-id="${g.id}" type="button">+ Agregar</button>
+        </div>
+        <div class="goal-task-add-form" id="goal-add-form-${g.id}" style="display:none">
+          <input class="goal-task-input" placeholder="Describe la actividad..." data-goal="${g.id}" />
+          <input type="date" class="goal-task-date-input" data-goal="${g.id}" value="${todayISO()}" />
+          <button class="primary-button goal-task-submit" data-goal="${g.id}" type="button">✓</button>
+        </div>
+        <div class="goal-task-list">
+          ${linkedTasks.length
+            ? linkedTasks.map((t) => `
+              <div class="goal-task-item${t.done ? " done" : ""}">
+                <button class="goal-task-check" data-toggle-task="${t.id}" type="button">${t.done ? "✅" : "⬜"}</button>
+                <span class="goal-task-label">${escapeHTML(t.title)}</span>
+                <span class="goal-task-meta">${formatDate(t.dueDate)}</span>
+                <button class="danger-button" data-delete="tasks" data-id="${t.id}" type="button" style="padding:2px 8px;font-size:0.72rem;min-height:unset">✕</button>
+              </div>`).join("")
+            : `<p class="empty-message" style="font-size:0.8rem;padding:6px 0;margin:0">Sin actividades aún.</p>`
+          }
+        </div>
+      </div>
+
+      <div class="goal-actions">
+        ${g.linkedTo
+          ? `<span class="item-meta" style="flex:1">🔗 Auto desde ${g.linkedTo === "gym_days" ? "gym" : "trabajo"}</span>`
+          : `<input class="goal-input" type="number" min="0" placeholder="Actualizar progreso..." data-goal-id="${g.id}" />
+             <button class="primary-button" style="min-height:36px;padding:0 12px" data-update-goal="${g.id}" type="button">OK</button>`
+        }
+        <button class="danger-button" data-delete-goal="${g.id}" type="button">✕</button>
+      </div>`;
+    container.appendChild(card);
   });
 }
 
+// ══ Google Calendar ══
+const GCAL_CLIENT_ID = "528665201579-nj98p7onvq28ts2voumljgoa5p7c9rc0.apps.googleusercontent.com";
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar";
+const GCAL_STORAGE_KEY = "gcal-token-v1";
+
+let gcalToken = null;
+let gcalEvents = [];
+
+function gcalSaveToken(t) { gcalToken = t; localStorage.setItem(GCAL_STORAGE_KEY, JSON.stringify(t)); }
+function gcalLoadToken() { try { const s = localStorage.getItem(GCAL_STORAGE_KEY); if (s) gcalToken = JSON.parse(s); } catch {} }
+function gcalIsConnected() { return gcalToken && gcalToken.access_token; }
+
+function gcalUpdateUI() {
+  if (gcalIsConnected()) {
+    $("#gcal-connect").style.display = "none";
+    $("#gcal-connected-label").style.display = "flex";
+  } else {
+    $("#gcal-connect").style.display = "";
+    $("#gcal-connected-label").style.display = "none";
+  }
+}
+
+async function gcalFetchEvents() {
+  if (!gcalIsConnected()) return;
+  const now = new Date();
+  const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+  const timeMax = new Date(now.getFullYear(), now.getMonth() + 3, 1).toISOString();
+  try {
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=200`,
+      { headers: { Authorization: `Bearer ${gcalToken.access_token}` } });
+    if (res.status === 401) { gcalDisconnect(); return; }
+    const data = await res.json();
+    if (data.error) return;
+    gcalEvents = (data.items || []).map((e) => ({
+      id: e.id, title: e.summary || "Sin título",
+      date: (e.start.dateTime || e.start.date || "").slice(0, 10),
+      time: e.start.dateTime ? e.start.dateTime.slice(11, 16) : "", kind: "gcal",
+    }));
+    renderCalendar();
+  } catch {}
+}
+
+async function gcalCreateEvent(item, type) {
+  if (!gcalIsConnected()) return null;
+  try {
+    const body = { summary: item.title || item.description, description: item.body || item.notes || "" };
+    if (type === "meeting" && item.time) {
+      const start = `${item.date}T${item.time}:00`;
+      const end = new Date(`${item.date}T${item.time}:00`);
+      end.setHours(end.getHours() + 1);
+      body.start = { dateTime: start, timeZone: "America/Lima" };
+      body.end   = { dateTime: end.toISOString().slice(0, 19), timeZone: "America/Lima" };
+    } else {
+      body.start = { date: item.date || item.dueDate };
+      body.end   = { date: item.date || item.dueDate };
+    }
+    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${gcalToken.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 401) { gcalDisconnect(); return null; }
+    const data = await res.json();
+    return data.id || null;
+  } catch { return null; }
+}
+
+async function gcalDeleteEvent(gcalId) {
+  if (!gcalIsConnected() || !gcalId) return;
+  try {
+    await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
+      method: "DELETE", headers: { Authorization: `Bearer ${gcalToken.access_token}` },
+    });
+  } catch {}
+}
+
+function gcalConnect() {
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GCAL_CLIENT_ID, scope: GCAL_SCOPE,
+    callback: async (response) => {
+      if (response.error) return;
+      gcalSaveToken({ access_token: response.access_token });
+      gcalUpdateUI();
+      await gcalFetchEvents();
+    },
+  });
+  client.requestAccessToken();
+}
+
+function gcalDisconnect() {
+  try { if (gcalToken?.access_token && typeof google !== "undefined") google.accounts.oauth2.revoke(gcalToken.access_token, () => {}); } catch {}
+  gcalToken = null; gcalEvents = [];
+  localStorage.removeItem(GCAL_STORAGE_KEY);
+  gcalUpdateUI(); renderCalendar();
+}
+
+function bindGcalEvents() {
+  $("#gcal-connect").addEventListener("click", gcalConnect);
+  $("#gcal-disconnect").addEventListener("click", gcalDisconnect);
+}
+
+// ══ Calendar ══
+let calendarDate = new Date();
+let calView = "week";
+let calFilter = "all";
+let goalCatFilter = "all";
+
+function buildEventsByDate() {
+  const map = {};
+  const push = (date, ev) => { if (!map[date]) map[date] = []; map[date].push(ev); };
+
+  state.meetings.forEach((m) => {
+    if (calFilter !== "all" && m.context !== calFilter) return;
+    push(m.date, { kind: "meeting", label: m.title, time: m.time, context: m.context });
+  });
+  state.tasks.filter((t) => !t.done).forEach((t) => {
+    if (calFilter !== "all" && t.context !== calFilter) return;
+    push(t.dueDate, { kind: "task", label: t.title, time: "", context: t.context });
+  });
+  if (calFilter === "all" || calFilter === "gcal") {
+    gcalEvents.forEach((e) => push(e.date, { kind: "gcal", label: e.title, time: e.time, context: null }));
+  }
+  return map;
+}
+
+function renderCalendar() {
+  renderCalFilters();
+  renderContextSelects();
+  if (calView === "month") renderMonthView();
+  else renderWeekView();
+  $("#cal-day-detail").classList.add("hidden");
+}
+
+function renderMonthView() {
+  const year = calendarDate.getFullYear(), month = calendarDate.getMonth();
+  $("#cal-month-label").textContent = new Date(year, month, 1).toLocaleDateString("es-PE", { month: "long", year: "numeric" });
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = todayISO();
+  const evByDate = buildEventsByDate();
+  const grid = $("#calendar-grid");
+  grid.innerHTML = "";
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement("div");
+    empty.className = "cal-cell cal-empty";
+    grid.appendChild(empty);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const events = evByDate[iso] || [];
+    const cell = document.createElement("div");
+    cell.className = `cal-cell${iso === today ? " cal-today" : ""}`;
+    cell.dataset.date = iso;
+    const dots = events.slice(0,3).map((e) => { const c = getEventColor(e); return `<span class="cal-dot" style="background:${c.dot}"></span>`; }).join("");
+    const labels = events.slice(0,2).map((e) => { const c = getEventColor(e); return `<span class="cal-event-label" style="background:${c.bg};color:${c.color}">${escapeHTML(e.label)}</span>`; }).join("");
+    const more = events.length > 2 ? `<span class="cal-more">+${events.length-2}</span>` : "";
+    cell.innerHTML = `<span class="cal-day-num">${d}</span><div class="cal-dots">${dots}</div><div class="cal-labels">${labels}${more}</div>`;
+    grid.appendChild(cell);
+  }
+}
+
+function renderWeekView() {
+  const d = new Date(calendarDate);
+  const sunday = new Date(d); sunday.setDate(d.getDate() - d.getDay());
+  const today = todayISO();
+  const evByDate = buildEventsByDate();
+  const weekEnd = new Date(sunday); weekEnd.setDate(sunday.getDate() + 6);
+  $("#cal-month-label").textContent =
+    sunday.toLocaleDateString("es-PE", { day: "numeric", month: "short" }) + " – " +
+    weekEnd.toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" });
+
+  const grid = $("#week-grid");
+  grid.innerHTML = "";
+  const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(sunday); date.setDate(sunday.getDate() + i);
+    const iso = date.toISOString().slice(0, 10);
+    const events = (evByDate[iso] || []).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    const isToday = iso === today;
+    const col = document.createElement("div");
+    col.className = `week-col${isToday ? " week-today" : ""}`;
+    col.dataset.date = iso;
+    const evHTML = events.length
+      ? events.map((e) => { const c = getEventColor(e); return `<div class="week-event" style="background:${c.bg};border-left-color:${c.dot}">${e.time ? `<span class="week-event-time">${e.time}</span>` : ""}<span class="week-event-title" style="color:${c.color}">${escapeHTML(e.label)}</span></div>`; }).join("")
+      : `<p class="week-empty">Sin eventos</p>`;
+    col.innerHTML = `<div class="week-col-header"><span class="week-day-name">${dayNames[i]}</span><span class="week-day-num${isToday ? " week-today-num" : ""}">${date.getDate()}</span></div><div class="week-col-events">${evHTML}</div>`;
+    grid.appendChild(col);
+  }
+}
+
+function showDayDetail(date, events) {
+  const detail = $("#cal-day-detail");
+  $("#cal-detail-title").textContent = formatDate(date);
+  const container = $("#cal-detail-items");
+  container.innerHTML = "";
+  if (!events.length) { container.innerHTML = `<p class="empty-message">Sin eventos este día.</p>`; }
+  else {
+    [...events].sort((a, b) => (a.time || "").localeCompare(b.time || "")).forEach((e) => {
+      const el = document.createElement("div");
+      el.className = "list-item";
+      const c = getEventColor(e);
+      const ctx = e.kind !== "gcal" ? getContextById(e.context) : null;
+      const label = e.kind === "gcal" ? "📅 Google" : (ctx ? `${ctx.emoji} ${ctx.label}` : "");
+      el.style.borderLeft = `3px solid ${c.dot}`;
+      el.innerHTML = `<div class="item-main"><div><p class="item-title">${escapeHTML(e.label)}</p>${e.time ? `<p class="item-meta">${e.time}</p>` : ""}</div>${label ? `<span class="pill" style="background:${c.bg};color:${c.color}">${label}</span>` : ""}</div>`;
+      container.appendChild(el);
+    });
+  }
+  detail.classList.remove("hidden");
+}
+
+function bindCalendarEvents() {
+  $("#cal-prev").addEventListener("click", () => {
+    if (calView === "month") calendarDate.setMonth(calendarDate.getMonth() - 1);
+    else calendarDate.setDate(calendarDate.getDate() - 7);
+    renderCalendar();
+  });
+  $("#cal-next").addEventListener("click", () => {
+    if (calView === "month") calendarDate.setMonth(calendarDate.getMonth() + 1);
+    else calendarDate.setDate(calendarDate.getDate() + 7);
+    renderCalendar();
+  });
+  $("#cal-detail-close").addEventListener("click", () => $("#cal-day-detail").classList.add("hidden"));
+  $("#cal-view-month").addEventListener("click", () => {
+    calView = "month";
+    $("#cal-month-view").classList.remove("hidden"); $("#cal-week-view").classList.add("hidden");
+    $("#cal-view-month").classList.add("active"); $("#cal-view-week").classList.remove("active");
+    renderCalendar();
+  });
+  $("#cal-view-week").addEventListener("click", () => {
+    calView = "week";
+    $("#cal-week-view").classList.remove("hidden"); $("#cal-month-view").classList.add("hidden");
+    $("#cal-view-week").classList.add("active"); $("#cal-view-month").classList.remove("active");
+    renderCalendar();
+  });
+  document.body.addEventListener("click", (e) => {
+    const cell = e.target.closest(".cal-cell:not(.cal-empty), .week-col");
+    if (!cell || !cell.dataset.date) return;
+    showDayDetail(cell.dataset.date, buildEventsByDate()[cell.dataset.date] || []);
+  });
+}
+
+// ── Attachments ──
+let pendingTaskAttachments = [];
+
+function bindAttachments() {
+  const fileInput = $("#task-file");
+  const box = $("#task-attach-box");
+  const listEl = $("#task-file-list");
+
+  function readFiles(files) {
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => { pendingTaskAttachments.push({ name: file.name, dataUrl: e.target.result, type: file.type }); renderFileList(); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderFileList() {
+    listEl.innerHTML = pendingTaskAttachments.map((f, i) => `
+      <div class="file-chip">
+        ${f.type.startsWith("image/") ? `<img src="${f.dataUrl}" class="file-thumb" />` : `<span class="file-icon">📄</span>`}
+        <span class="file-name">${escapeHTML(f.name)}</span>
+        <button class="file-remove" data-idx="${i}" type="button">✕</button>
+      </div>`).join("");
+    listEl.querySelectorAll(".file-remove").forEach((btn) => btn.addEventListener("click", () => { pendingTaskAttachments.splice(Number(btn.dataset.idx), 1); renderFileList(); }));
+    $("#task-attach-placeholder").style.display = pendingTaskAttachments.length ? "none" : "";
+  }
+
+  fileInput.addEventListener("change", () => { readFiles(fileInput.files); fileInput.value = ""; });
+  box.addEventListener("click", (e) => { if (!e.target.closest(".file-chip")) fileInput.click(); });
+  box.addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("drag-over"); });
+  box.addEventListener("dragleave", () => box.classList.remove("drag-over"));
+  box.addEventListener("drop", (e) => { e.preventDefault(); box.classList.remove("drag-over"); readFiles(e.dataTransfer.files); });
+}
+
+// ── Form submit ──
+function handleSubmit(formId, collection, mapper, gcalType) {
+  const form = $(formId);
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    const item = { id: uid(), ...mapper(data) };
+    state[collection].push(item);
+    form.reset(); setDefaultDates(); saveState(); render();
+    if (gcalType && gcalIsConnected()) {
+      const gcalId = await gcalCreateEvent(item, gcalType);
+      if (gcalId) { item.gcalId = gcalId; saveState(); }
+      gcalFetchEvents();
+    }
+  });
+}
+
+// ── Seed ──
 function seedDemoData() {
   state = {
+    ...emptyState,
+    contexts: state.contexts,
     finances: [
-      { id: uid(), type: "income", description: "Ingreso principal", category: "Trabajo", amount: 4200, date: todayISO() },
-      { id: uid(), type: "expense", description: "Alquiler", category: "Casa", amount: 1350, date: todayISO() },
-      { id: uid(), type: "expense", description: "Supermercado", category: "Comida", amount: 260, date: todayISO() },
+      { id: uid(), type: "income", subtype: "extra", description: "Freelance diseño", category: "Extra", amount: 800, date: todayISO() },
+      { id: uid(), type: "expense", description: "Alquiler", category: "Casa", amount: 1200, date: todayISO() },
+      { id: uid(), type: "expense", description: "Supermercado", category: "Comida", amount: 280, date: todayISO() },
+    ],
+    jobs: [
+      { id: "job1", name: "Empresa Principal S.A.", amount: 3500, payDay: 15 },
+      { id: "job2", name: "Consultora XYZ", amount: 2200, payDay: 30 },
     ],
     tasks: [
-      { id: uid(), title: "Enviar reporte semanal", area: "Trabajo", priority: "Alta", dueDate: todayISO(), done: false },
-      { id: uid(), title: "Revisar presupuesto del mes", area: "Finanzas", priority: "Media", dueDate: todayISO(), done: false },
-      { id: uid(), title: "Ordenar documentos personales", area: "Personal", priority: "Baja", dueDate: todayISO(), done: true },
+      { id: uid(), title: "Enviar informe mensual", body: "Incluir gráficos de ventas", dueDate: todayISO(), context: "trabajo", done: false, attachments: [] },
+      { id: uid(), title: "Pagar servicios", body: "", dueDate: todayISO(), context: "personal", done: false, attachments: [] },
     ],
     meetings: [
-      { id: uid(), title: "Planificacion de proyecto", people: "Equipo", date: todayISO(), time: "10:30", notes: "Definir prioridades y responsables." },
+      { id: uid(), title: "Reunión de equipo", people: "Equipo", date: todayISO(), time: "10:00", notes: "Revisar métricas", context: "trabajo" },
     ],
     notes: [
-      { id: uid(), title: "Meta del mes", tag: "Personal", body: "Separar ahorro antes de gastos variables.", createdAt: new Date().toISOString() },
+      { id: uid(), title: "Meta del trimestre", tag: "Finanzas", body: "Alcanzar S/ 2,000 de ahorro.", createdAt: new Date().toISOString() },
+    ],
+    gym: [
+      { id: uid(), date: todayISO(), note: "" },
+    ],
+    goals: [
+      { id: uid(), emoji: "🏦", title: "Fondo de emergencia", type: "financiera", target: 5000, current: 1500, unit: "S/", deadline: "" },
+      { id: uid(), emoji: "💪", title: "Ir al gym 20 días", type: "personal", target: 20, current: 8, unit: "días", deadline: "" },
+    ],
+    savings: [
+      { id: uid(), name: "Viaje a Europa", target: 8000, current: 2000, deadline: "2027-06-01", emoji: "✈️" },
+    ],
+    investments: [
+      { id: uid(), name: "Fondo mutuo Sura", type: "Fondo mutuo", amount: 3000, date: todayISO(), notes: "Tasa 6.5% anual" },
+    ],
+    workLogs: [
+      { id: uid(), project: "Proyecto Alpha", hours: 3, date: todayISO(), notes: "Avancé el módulo de reportes" },
     ],
   };
-  saveState();
-  render();
+  saveState(); render();
 }
 
 function exportData() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `alex-app-backup-${todayISO()}.json`;
-  link.click();
+  const a = document.createElement("a");
+  a.href = url; a.download = `alex-app-backup-${todayISO()}.json`; a.click();
   URL.revokeObjectURL(url);
 }
 
+// ── Render all ──
+function render() {
+  renderContextSelects();
+  renderGoalSelects();
+  renderDashboard();
+  renderFinances();
+  renderTasks();
+  renderMeetings();
+  renderNotes();
+  renderGoals();
+  renderGym();
+  renderWorkLog();
+}
+
+// ── Pre-form tasks (tasks added before creating the goal) ──
+let pendingGoalTasks = []; // [{title, dueDate}]
+
+function renderPreformTasks() {
+  const list = $("#goal-preform-list");
+  if (!list) return;
+  list.innerHTML = "";
+  pendingGoalTasks.forEach((t, i) => {
+    const div = document.createElement("div");
+    div.className = "goal-task-item";
+    div.innerHTML = `
+      <span class="goal-task-check">⬜</span>
+      <span class="goal-task-label">${escapeHTML(t.title)}</span>
+      <span class="goal-task-meta">${formatDate(t.dueDate)}</span>
+      <button class="danger-button" data-remove-preform="${i}" type="button" style="padding:2px 8px;font-size:0.72rem;min-height:unset">✕</button>`;
+    list.appendChild(div);
+  });
+}
+
+// ── Events ──
 function bindEvents() {
   $$(".nav-tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
-  $("#task-filter").addEventListener("change", renderTasks);
-  $("#note-search").addEventListener("input", renderNotes);
-  $("#seed-demo").addEventListener("click", seedDemoData);
-  $("#export-data").addEventListener("click", exportData);
+  $$(".org-tab[data-org]").forEach((tab) => tab.addEventListener("click", () => switchOrgTab(tab.dataset.org)));
+  $$(".org-tab[data-fin]").forEach((tab) => tab.addEventListener("click", () => switchFinTab(tab.dataset.fin)));
+  $$(".org-tab[data-perf]").forEach((tab) => tab.addEventListener("click", () => switchPerfTab(tab.dataset.perf)));
+  $$(".org-tab[data-meet]").forEach((tab) => tab.addEventListener("click", () => switchMeetTab(tab.dataset.meet)));
 
-  document.body.addEventListener("click", (event) => {
-    const deleteButton = event.target.closest("[data-delete]");
-    const toggleTaskButton = event.target.closest("[data-toggle-task]");
+  $("#task-filter")?.addEventListener("change", renderTasks);
+  $("#task-goal-filter")?.addEventListener("change", renderTasks);
+  $("#note-search")?.addEventListener("input", renderNotes);
 
+  // Pre-form: toggle add form
+  $("#goal-preform-add")?.addEventListener("click", () => {
+    const f = $("#goal-preform-form");
+    if (f) { f.style.display = f.style.display === "none" ? "flex" : "none"; if (f.style.display === "flex") { setDefaultDates(); $("#goal-preform-title")?.focus(); } }
+  });
+  // Pre-form: submit activity (stays open to add more)
+  $("#goal-preform-submit")?.addEventListener("click", () => {
+    const titleEl = $("#goal-preform-title");
+    const dateEl  = $("#goal-preform-date");
+    const title   = titleEl?.value?.trim();
+    if (!title) return;
+    pendingGoalTasks.push({ title, dueDate: dateEl?.value || todayISO() });
+    if (titleEl) { titleEl.value = ""; titleEl.focus(); }
+    renderPreformTasks();
+  });
+
+  // Pre-form: also submit on Enter key
+  $("#goal-preform-title")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); $("#goal-preform-submit")?.click(); }
+  });
+  $("#seed-demo")?.addEventListener("click", seedDemoData);
+  $("#export-data")?.addEventListener("click", exportData);
+
+  // Gym today
+  $("#gym-today-btn")?.addEventListener("click", () => {
+    const today = todayISO();
+    if ((state.gym || []).find((g) => g.date === today)) return;
+    state.gym = state.gym || [];
+    state.gym.push({ id: uid(), date: today, note: "" });
+    saveState(); renderGym(); renderDashboard();
+  });
+
+  // Gym calendar click
+  document.body.addEventListener("click", (e) => {
+    const gymDay = e.target.closest(".gym-day");
+    if (gymDay) {
+      const date = gymDay.dataset.date;
+      if (!date) return;
+      state.gym = state.gym || [];
+      const existing = state.gym.findIndex((g) => g.date === date);
+      if (existing >= 0) state.gym.splice(existing, 1);
+      else state.gym.push({ id: uid(), date, note: "" });
+      saveState(); renderGym(); renderDashboard();
+    }
+
+    // Remove pre-form pending task
+    const removePreform = e.target.closest("[data-remove-preform]");
+    if (removePreform) {
+      pendingGoalTasks.splice(Number(removePreform.dataset.removePreform), 1);
+      renderPreformTasks();
+    }
+
+    // Goal category filter
+    const catBtn = e.target.closest(".goal-cat-btn");
+    if (catBtn) {
+      goalCatFilter = catBtn.dataset.cat;
+      $$(".goal-cat-btn").forEach((b) => b.classList.toggle("active", b.dataset.cat === goalCatFilter));
+      renderGoals();
+    }
+
+    // Toggle goal task add form
+    const addTaskBtn = e.target.closest(".goal-add-task-btn");
+    if (addTaskBtn) {
+      const formEl = $(`#goal-add-form-${addTaskBtn.dataset.goalId}`);
+      if (formEl) formEl.style.display = formEl.style.display === "none" ? "flex" : "none";
+    }
+
+    // Submit quick goal task
+    const submitGoalTask = e.target.closest(".goal-task-submit");
+    if (submitGoalTask) {
+      const goalId = submitGoalTask.dataset.goal;
+      const input = document.querySelector(`.goal-task-input[data-goal="${goalId}"]`);
+      const dateEl = document.querySelector(`.goal-task-date-input[data-goal="${goalId}"]`);
+      const title = input?.value?.trim();
+      if (!title) return;
+      const task = {
+        id: uid(), title,
+        body: "", dueDate: dateEl?.value || todayISO(),
+        context: state.contexts[0]?.id || "",
+        goalId,
+        done: false, attachments: [],
+      };
+      state.tasks.push(task);
+      if (input) input.value = "";
+      saveState(); renderGoals(); renderDashboard();
+    }
+
+    const delGym = e.target.closest("[data-delete-gym]");
+    if (delGym) {
+      state.gym = (state.gym || []).filter((g) => g.id !== delGym.dataset.deleteGym);
+      saveState(); renderGym(); renderDashboard();
+    }
+
+    const delLog = e.target.closest("[data-delete-log]");
+    if (delLog) {
+      state.workLogs = (state.workLogs || []).filter((l) => l.id !== delLog.dataset.deleteLog);
+      saveState(); renderWorkLog();
+    }
+
+    const delGoal = e.target.closest("[data-delete-goal]");
+    if (delGoal) {
+      state.goals = (state.goals || []).filter((g) => g.id !== delGoal.dataset.deleteGoal);
+      saveState(); renderGoals(); renderDashboard();
+    }
+
+    const updateGoal = e.target.closest("[data-update-goal]");
+    if (updateGoal) {
+      const goalId = updateGoal.dataset.updateGoal;
+      const input = document.querySelector(`input[data-goal-id="${goalId}"]`);
+      if (input && input.value !== "") {
+        const goal = state.goals.find((g) => g.id === goalId);
+        if (goal) { goal.current = Number(input.value); saveState(); renderGoals(); renderDashboard(); }
+      }
+    }
+
+    const delSaving = e.target.closest("[data-delete-saving]");
+    if (delSaving) {
+      state.savings = (state.savings || []).filter((s) => s.id !== delSaving.dataset.deleteSaving);
+      saveState(); renderSavings();
+    }
+
+    const delInv = e.target.closest("[data-delete-inv]");
+    if (delInv) {
+      state.investments = (state.investments || []).filter((i) => i.id !== delInv.dataset.deleteInv);
+      saveState(); renderInvestments();
+    }
+
+    const deleteButton = e.target.closest("[data-delete]");
     if (deleteButton) {
       const collection = deleteButton.dataset.delete;
-      state[collection] = state[collection].filter((item) => item.id !== deleteButton.dataset.id);
-      saveState();
-      render();
+      const item = state[collection].find((i) => i.id === deleteButton.dataset.id);
+      if (item?.gcalId) gcalDeleteEvent(item.gcalId);
+      state[collection] = state[collection].filter((i) => i.id !== deleteButton.dataset.id);
+      saveState(); render();
     }
 
-    if (toggleTaskButton) {
-      const task = state.tasks.find((item) => item.id === toggleTaskButton.dataset.toggleTask);
-      if (task) task.done = !task.done;
-      saveState();
-      render();
+    const toggleTask = e.target.closest("[data-toggle-task]");
+    if (toggleTask) {
+      const task = state.tasks.find((t) => t.id === toggleTask.dataset.toggleTask);
+      if (task) { task.done = !task.done; saveState(); render(); }
     }
   });
 
-  handleSubmit("#finance-form", "finances", (data) => ({
-    type: data.type,
-    description: data.description.trim(),
-    category: data.category.trim(),
-    amount: Number(data.amount),
-    date: data.date,
+  // Jobs save
+  ["job1", "job2"].forEach((jobId, idx) => {
+    $(`#${jobId}-save`)?.addEventListener("click", () => {
+      state.jobs = state.jobs || emptyState.jobs;
+      state.jobs[idx] = {
+        id: jobId,
+        name: $(`#${jobId}-name`)?.value?.trim() || "",
+        amount: Number($(`#${jobId}-amount`)?.value) || 0,
+        payDay: Number($(`#${jobId}-payday`)?.value) || 15,
+      };
+      saveState(); renderFinances();
+    });
+  });
+
+  // Forms
+  handleSubmit("#extra-form", "finances", (data) => ({
+    type: "income", subtype: "extra",
+    description: data.description.trim(), category: "Extra",
+    amount: Number(data.amount), date: data.date,
   }));
 
-  handleSubmit("#task-form", "tasks", (data) => ({
-    title: data.title.trim(),
-    area: data.area,
-    priority: data.priority,
-    dueDate: data.dueDate,
-    done: false,
+  handleSubmit("#expense-form", "finances", (data) => ({
+    type: "expense",
+    description: data.description.trim(), category: data.category.trim(),
+    amount: Number(data.amount), date: data.date,
   }));
+
+  handleSubmit("#savings-form", "savings", (data) => ({
+    name: data.name.trim(), target: Number(data.target),
+    current: Number(data.current) || 0,
+    deadline: data.deadline || "", emoji: data.emoji || "🏦",
+  }));
+
+  handleSubmit("#investment-form", "investments", (data) => ({
+    name: data.name.trim(), type: data.type,
+    amount: Number(data.amount), date: data.date,
+    notes: (data.notes || "").trim(),
+  }));
+
+  handleSubmit("#task-form", "tasks", (data) => {
+    const item = {
+      title: data.title.trim(), body: (data.body || "").trim(),
+      dueDate: data.dueDate, context: data.context || state.contexts[0]?.id,
+      goalId: data.goalId || "",
+      attachments: pendingTaskAttachments.map((a) => ({ name: a.name, dataUrl: a.dataUrl, type: a.type })),
+      done: false,
+    };
+    pendingTaskAttachments = [];
+    return item;
+  }, "task");
 
   handleSubmit("#meeting-form", "meetings", (data) => ({
-    title: data.title.trim(),
-    people: data.people.trim(),
-    date: data.date,
-    time: data.time,
-    notes: data.notes.trim(),
-  }));
+    title: data.title.trim(), people: (data.people || "").trim(),
+    date: data.date, time: data.time,
+    notes: (data.notes || "").trim(), context: data.context || state.contexts[0]?.id,
+  }), "meeting");
 
   handleSubmit("#note-form", "notes", (data) => ({
-    title: data.title.trim(),
-    tag: data.tag.trim(),
-    body: data.body.trim(),
-    createdAt: new Date().toISOString(),
+    title: data.title.trim(), tag: (data.tag || "").trim(),
+    body: data.body.trim(), createdAt: new Date().toISOString(),
   }));
 
-  window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    $("#install-app").classList.remove("hidden");
+  handleSubmit("#worklog-form", "workLogs", (data) => ({
+    project: data.project.trim(), hours: Number(data.hours),
+    date: data.date, notes: (data.notes || "").trim(),
+  }));
+
+  // Goal form — custom submit (needs to also create pending tasks)
+  $("#goal-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const goalId = uid();
+    const goal = {
+      id: goalId,
+      emoji: "🎯",
+      title: data.title.trim(),
+      category: data.category,
+      type: data.category, // backward compat
+      frequency: data.frequency || "unica",
+      repetitive: !!data.repetitive,
+      target: Number(data.target) || 100,
+      current: 0,
+      unit: data.unit?.trim() || "",
+      deadline: data.deadline || "",
+      linkedTo: data.linkedTo || "",
+    };
+    state.goals = state.goals || [];
+    state.goals.push(goal);
+
+    // Create pending activities as tasks
+    pendingGoalTasks.forEach((t) => {
+      state.tasks.push({
+        id: uid(), title: t.title, body: "",
+        dueDate: t.dueDate, context: state.contexts[0]?.id || "",
+        goalId, done: false, attachments: [],
+      });
+    });
+    pendingGoalTasks = [];
+
+    e.target.reset(); setDefaultDates(); renderPreformTasks();
+    saveState(); render();
   });
 
-  $("#install-app").addEventListener("click", async () => {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); deferredInstallPrompt = e;
+    $("#install-app")?.classList.remove("hidden");
+  });
+  $("#install-app")?.addEventListener("click", async () => {
     if (!deferredInstallPrompt) return;
     deferredInstallPrompt.prompt();
     await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
-    $("#install-app").classList.add("hidden");
+    $("#install-app")?.classList.add("hidden");
   });
 }
 
-$("#today-label").textContent = new Date().toLocaleDateString("es-PE", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-});
-
+// ── Init ──
+$("#today-label").textContent = new Date().toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
 setDefaultDates();
+checkRepetitiveGoals(); // auto-renew repetitive goals if expired
+gcalLoadToken();
+gcalUpdateUI();
+if (gcalIsConnected()) gcalFetchEvents();
 bindEvents();
+bindCalendarEvents();
+bindGcalEvents();
+bindAttachments();
 render();
 
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
-}
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");

@@ -3,13 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#18211b" />
+    <meta name="theme-color" content="#0c0c0c" />
     <title>Alex App</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="app-shell">
+
+      <!-- ── SIDEBAR ── -->
       <aside class="sidebar" aria-label="Navegacion principal">
         <div class="brand">
           <div class="brand-mark">A</div>
@@ -21,19 +23,22 @@
 
         <nav class="nav-tabs" aria-label="Secciones">
           <button class="nav-tab active" data-view="dashboard" type="button">
-            <span>Inicio</span>
+            <span class="nav-icon">⚡</span><span>Inicio</span>
           </button>
           <button class="nav-tab" data-view="finances" type="button">
-            <span>Finanzas</span>
+            <span class="nav-icon">💰</span><span>Finanzas</span>
           </button>
-          <button class="nav-tab" data-view="tasks" type="button">
-            <span>Tareas</span>
+          <button class="nav-tab" data-view="organizer" type="button">
+            <span class="nav-icon">✅</span><span>Actividades</span>
           </button>
           <button class="nav-tab" data-view="meetings" type="button">
-            <span>Reuniones</span>
+            <span class="nav-icon">🤝</span><span>Reuniones</span>
           </button>
-          <button class="nav-tab" data-view="notes" type="button">
-            <span>Notas</span>
+          <button class="nav-tab" data-view="performance" type="button">
+            <span class="nav-icon">🎯</span><span>Metas</span>
+          </button>
+          <button class="nav-tab" data-view="calendar" type="button">
+            <span class="nav-icon">📅</span><span>Calendario</span>
           </button>
         </nav>
 
@@ -43,6 +48,7 @@
         </div>
       </aside>
 
+      <!-- ── WORKSPACE ── -->
       <main class="workspace">
         <header class="topbar">
           <div>
@@ -55,6 +61,7 @@
           </div>
         </header>
 
+        <!-- ══ DASHBOARD ══ -->
         <section id="dashboard" class="view active-view" aria-labelledby="view-title">
           <div class="metric-grid">
             <article class="metric-card">
@@ -68,197 +75,425 @@
               <span id="metric-due-tasks">0 para hoy</span>
             </article>
             <article class="metric-card">
-              <p>Proxima reunion</p>
-              <strong id="metric-next-meeting">Sin reuniones</strong>
-              <span id="metric-next-meeting-time">Agenda limpia</span>
+              <p>Racha gym 🔥</p>
+              <strong id="metric-gym-streak">0 días</strong>
+              <span id="metric-gym-week">Esta semana: 0 días</span>
             </article>
             <article class="metric-card">
-              <p>Notas activas</p>
-              <strong id="metric-notes">0</strong>
-              <span>Ideas y seguimiento personal</span>
+              <p>Metas activas</p>
+              <strong id="metric-goals">0</strong>
+              <span id="metric-goals-sub">Sin metas creadas</span>
             </article>
           </div>
 
           <div class="dashboard-grid">
             <section class="panel">
-              <div class="panel-header">
-                <h3>Prioridad de hoy</h3>
-              </div>
+              <div class="panel-header"><h3>⚡ Prioridad de hoy</h3></div>
               <div id="today-tasks" class="item-list empty-space"></div>
             </section>
             <section class="panel">
-              <div class="panel-header">
-                <h3>Movimiento reciente</h3>
-              </div>
+              <div class="panel-header"><h3>💰 Movimiento reciente</h3></div>
               <div id="recent-finances" class="item-list empty-space"></div>
             </section>
             <section class="panel">
-              <div class="panel-header">
-                <h3>Agenda cercana</h3>
-              </div>
-              <div id="upcoming-meetings" class="item-list empty-space"></div>
+              <div class="panel-header"><h3>🎯 Metas</h3></div>
+              <div id="dash-goals" class="item-list empty-space"></div>
             </section>
           </div>
         </section>
 
+        <!-- ══ FINANZAS ══ -->
         <section id="finances" class="view" aria-labelledby="view-title">
-          <div class="content-grid">
-            <form id="finance-form" class="panel form-panel">
-              <div class="panel-header">
-                <h3>Nuevo movimiento</h3>
+          <div class="org-tabs">
+            <button class="org-tab active" data-fin="income">💰 Ingresos</button>
+            <button class="org-tab" data-fin="expense">💸 Gastos</button>
+            <button class="org-tab" data-fin="savings">🏦 Ahorro</button>
+            <button class="org-tab" data-fin="investments">📈 Inversiones</button>
+          </div>
+
+          <!-- Ingresos -->
+          <div id="fin-income" class="org-panel">
+            <div class="income-grid">
+              <div class="panel income-block">
+                <div class="panel-header"><h3>💼 Trabajo 1</h3><span id="job1-summary"></span></div>
+                <div class="income-form-inline">
+                  <label>Empresa<input id="job1-name" placeholder="Nombre empresa..." /></label>
+                  <label>Monto mensual<input id="job1-amount" type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                  <label>Día de pago<input id="job1-payday" type="number" min="1" max="31" placeholder="15" /></label>
+                  <button class="primary-button income-btn" id="job1-save" type="button">Guardar</button>
+                </div>
+                <div id="job1-display" class="item-list" style="margin-top:8px"></div>
               </div>
-              <label>
-                Tipo
-                <select name="type">
-                  <option value="income">Ingreso</option>
-                  <option value="expense">Gasto</option>
-                </select>
-              </label>
-              <label>
-                Descripcion
-                <input name="description" required placeholder="Sueldo, comida, transporte..." />
-              </label>
-              <label>
-                Categoria
-                <input name="category" required placeholder="Trabajo, casa, salud..." />
-              </label>
-              <label>
-                Monto
-                <input name="amount" required min="0" step="0.01" type="number" placeholder="0.00" />
-              </label>
-              <label>
-                Fecha
-                <input name="date" required type="date" />
-              </label>
-              <button class="primary-button" type="submit">Guardar movimiento</button>
-            </form>
-            <section class="panel list-panel">
-              <div class="panel-header">
-                <h3>Finanzas</h3>
-                <span id="finance-summary"></span>
+              <div class="panel income-block">
+                <div class="panel-header"><h3>💼 Trabajo 2</h3><span id="job2-summary"></span></div>
+                <div class="income-form-inline">
+                  <label>Empresa<input id="job2-name" placeholder="Nombre empresa..." /></label>
+                  <label>Monto mensual<input id="job2-amount" type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                  <label>Día de pago<input id="job2-payday" type="number" min="1" max="31" placeholder="15" /></label>
+                  <button class="primary-button income-btn" id="job2-save" type="button">Guardar</button>
+                </div>
+                <div id="job2-display" class="item-list" style="margin-top:8px"></div>
               </div>
-              <div id="finance-list" class="item-list empty-space"></div>
-            </section>
+              <div class="panel income-block">
+                <div class="panel-header"><h3>⚡ Ingresos extras</h3><span id="extra-summary"></span></div>
+                <form id="extra-form" class="income-form-inline">
+                  <label>Descripción<input name="description" required placeholder="Freelance, venta..." /></label>
+                  <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                  <label>Fecha<input name="date" required type="date" /></label>
+                  <button class="primary-button income-btn" type="submit">+ Agregar</button>
+                </form>
+                <div id="extra-list" class="item-list empty-space" style="margin-top:8px"></div>
+              </div>
+            </div>
+            <div class="income-total-bar">
+              <span>Total ingresos del mes</span>
+              <strong id="income-total">S/ 0.00</strong>
+            </div>
+          </div>
+
+          <!-- Gastos -->
+          <div id="fin-expense" class="org-panel hidden">
+            <div class="content-grid">
+              <form id="expense-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nuevo gasto</h3></div>
+                <label>Descripción<input name="description" required placeholder="Alquiler, comida..." /></label>
+                <label>Categoría<input name="category" required placeholder="Casa, comida, salud..." /></label>
+                <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                <label>Fecha<input name="date" required type="date" /></label>
+                <button class="primary-button expense-btn" type="submit">Guardar gasto</button>
+              </form>
+              <section class="panel list-panel">
+                <div class="panel-header"><h3>Gastos</h3><span id="expense-summary"></span></div>
+                <div id="expense-list" class="item-list empty-space"></div>
+              </section>
+            </div>
+          </div>
+
+          <!-- Ahorro -->
+          <div id="fin-savings" class="org-panel hidden">
+            <div class="content-grid">
+              <form id="savings-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nueva meta de ahorro</h3></div>
+                <label>Nombre<input name="name" required placeholder="Viaje, emergencia, auto..." /></label>
+                <label>Meta (S/)<input name="target" required type="number" min="0" step="0.01" placeholder="5000" /></label>
+                <label>Ahorro actual (S/)<input name="current" type="number" min="0" step="0.01" placeholder="0" /></label>
+                <label>Fecha límite<input name="deadline" type="date" /></label>
+                <label>Emoji<input name="emoji" placeholder="🎯" maxlength="2" /></label>
+                <button class="primary-button" type="submit">Crear meta</button>
+              </form>
+              <div>
+                <div id="savings-list" class="item-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inversiones -->
+          <div id="fin-investments" class="org-panel hidden">
+            <div class="content-grid">
+              <form id="investment-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nueva inversión</h3></div>
+                <label>Nombre<input name="name" required placeholder="Fondo mutuo, CTS, plazo fijo..." /></label>
+                <label>Tipo<select name="type">
+                  <option value="Fondo mutuo">Fondo mutuo</option>
+                  <option value="Plazo fijo">Plazo fijo</option>
+                  <option value="CTS">CTS</option>
+                  <option value="Depósito">Depósito</option>
+                  <option value="Otro">Otro</option>
+                </select></label>
+                <label>Monto (S/)<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                <label>Fecha<input name="date" required type="date" /></label>
+                <label>Notas<textarea name="notes" rows="2" placeholder="Banco, tasa, detalles..."></textarea></label>
+                <button class="primary-button" type="submit">Registrar</button>
+              </form>
+              <div>
+                <div id="investment-list" class="item-list"></div>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section id="tasks" class="view" aria-labelledby="view-title">
+        <!-- ══ ACTIVIDADES (solo tareas) ══ -->
+        <section id="organizer" class="view" aria-labelledby="view-title">
           <div class="content-grid">
             <form id="task-form" class="panel form-panel">
-              <div class="panel-header">
-                <h3>Nueva tarea</h3>
-              </div>
-              <label>
-                Titulo
-                <input name="title" required placeholder="Preparar reporte..." />
-              </label>
-              <label>
-                Area
-                <select name="area">
-                  <option value="Trabajo">Trabajo</option>
-                  <option value="Personal">Personal</option>
-                  <option value="Finanzas">Finanzas</option>
-                  <option value="Casa">Casa</option>
+              <div class="panel-header"><h3>Nueva tarea</h3></div>
+              <label>Título<input name="title" required placeholder="¿Qué hay que hacer?" /></label>
+              <label>Contexto<select name="context"></select></label>
+              <label>Fecha límite<input name="dueDate" required type="date" /></label>
+              <label>Vincular a meta
+                <select name="goalId" id="task-goal-select">
+                  <option value="">Sin meta</option>
                 </select>
               </label>
-              <label>
-                Prioridad
-                <select name="priority">
-                  <option value="Alta">Alta</option>
-                  <option value="Media">Media</option>
-                  <option value="Baja">Baja</option>
-                </select>
-              </label>
-              <label>
-                Fecha limite
-                <input name="dueDate" required type="date" />
+              <label>Detalle<textarea name="body" rows="3" placeholder="Describe la tarea..."></textarea></label>
+              <label class="attach-label">Adjuntar
+                <div class="attach-box" id="task-attach-box">
+                  <input type="file" name="attachment" id="task-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple />
+                  <div class="attach-placeholder" id="task-attach-placeholder">
+                    <span class="attach-icon">📎</span>
+                    <span>Arrastra o haz clic</span>
+                  </div>
+                  <div id="task-file-list" class="file-list"></div>
+                </div>
               </label>
               <button class="primary-button" type="submit">Guardar tarea</button>
             </form>
             <section class="panel list-panel">
               <div class="panel-header">
                 <h3>Tareas</h3>
-                <select id="task-filter" aria-label="Filtrar tareas">
-                  <option value="all">Todas</option>
-                  <option value="open">Pendientes</option>
-                  <option value="done">Completadas</option>
-                </select>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <select id="task-goal-filter" aria-label="Filtrar por meta" style="font-size:0.8rem;padding:4px 8px;background:var(--surface-3);border:1px solid var(--line);border-radius:6px;color:var(--ink-2)">
+                    <option value="all">Todas las metas</option>
+                  </select>
+                  <select id="task-filter" aria-label="Filtrar tareas">
+                    <option value="all">Todas</option>
+                    <option value="open">Pendientes</option>
+                    <option value="done">Completadas</option>
+                  </select>
+                </div>
               </div>
               <div id="task-list" class="item-list empty-space"></div>
             </section>
           </div>
         </section>
 
+        <!-- ══ REUNIONES ══ -->
         <section id="meetings" class="view" aria-labelledby="view-title">
-          <div class="content-grid">
-            <form id="meeting-form" class="panel form-panel">
-              <div class="panel-header">
-                <h3>Nueva reunion</h3>
-              </div>
-              <label>
-                Tema
-                <input name="title" required placeholder="Revision semanal..." />
-              </label>
-              <label>
-                Con quien
-                <input name="people" placeholder="Equipo, cliente, proveedor..." />
-              </label>
-              <label>
-                Fecha
-                <input name="date" required type="date" />
-              </label>
-              <label>
-                Hora
-                <input name="time" required type="time" />
-              </label>
-              <label>
-                Notas
-                <textarea name="notes" rows="4" placeholder="Puntos a tratar"></textarea>
-              </label>
-              <button class="primary-button" type="submit">Guardar reunion</button>
-            </form>
-            <section class="panel list-panel">
-              <div class="panel-header">
-                <h3>Agenda</h3>
-                <span id="meeting-summary"></span>
-              </div>
-              <div id="meeting-list" class="item-list empty-space"></div>
-            </section>
+          <div class="org-tabs">
+            <button class="org-tab active" data-meet="meetings">🤝 Reuniones</button>
+            <button class="org-tab" data-meet="notes">📝 Notas</button>
+          </div>
+
+          <!-- Reuniones -->
+          <div id="meet-meetings" class="org-panel">
+            <div class="content-grid">
+              <form id="meeting-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nueva reunión</h3></div>
+                <label>Tema<input name="title" required placeholder="Revisión semanal..." /></label>
+                <label>Contexto<select name="context"></select></label>
+                <label>Con quién<input name="people" placeholder="Equipo, cliente..." /></label>
+                <label>Fecha<input name="date" required type="date" /></label>
+                <label>Hora<input name="time" required type="time" /></label>
+                <label>Notas<textarea name="notes" rows="3" placeholder="Puntos a tratar..."></textarea></label>
+                <button class="primary-button" type="submit">Guardar reunión</button>
+              </form>
+              <section class="panel list-panel">
+                <div class="panel-header"><h3>Agenda</h3><span id="meeting-summary"></span></div>
+                <div id="meeting-list" class="item-list empty-space"></div>
+              </section>
+            </div>
+          </div>
+
+          <!-- Notas -->
+          <div id="meet-notes" class="org-panel hidden">
+            <div class="content-grid">
+              <form id="note-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nueva nota</h3></div>
+                <label>Título<input name="title" required placeholder="Idea, pendiente, decisión..." /></label>
+                <label>Etiqueta<input name="tag" placeholder="Trabajo, vida, idea..." /></label>
+                <label>Contenido<textarea name="body" required rows="6" placeholder="Escribe lo importante..."></textarea></label>
+                <button class="primary-button" type="submit">Guardar nota</button>
+              </form>
+              <section class="panel list-panel">
+                <div class="panel-header">
+                  <h3>Notas</h3>
+                  <input id="note-search" class="search-input" placeholder="Buscar..." />
+                </div>
+                <div id="note-list" class="item-list empty-space"></div>
+              </section>
+            </div>
           </div>
         </section>
 
-        <section id="notes" class="view" aria-labelledby="view-title">
-          <div class="content-grid">
-            <form id="note-form" class="panel form-panel">
-              <div class="panel-header">
-                <h3>Nueva nota</h3>
+        <!-- ══ METAS (was Rendimiento) ══ -->
+        <section id="performance" class="view" aria-labelledby="view-title">
+          <div class="org-tabs">
+            <button class="org-tab active" data-perf="goals">🎯 Metas</button>
+            <button class="org-tab" data-perf="stats">📊 Estadísticas</button>
+          </div>
+
+          <!-- Metas -->
+          <div id="perf-goals" class="org-panel">
+            <div class="goal-cat-bar" id="goal-cat-bar">
+              <button class="goal-cat-btn active" data-cat="all">Todas</button>
+              <button class="goal-cat-btn" data-cat="ejercicio">💪 Ejercicio</button>
+              <button class="goal-cat-btn" data-cat="trabajo">🧠 Trabajo</button>
+              <button class="goal-cat-btn" data-cat="personal">🏠 Personal</button>
+              <button class="goal-cat-btn" data-cat="financiero">💰 Financiero</button>
+            </div>
+            <div class="content-grid">
+
+              <!-- Formulario nueva meta -->
+              <form id="goal-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nueva meta</h3></div>
+                <label>Título de la meta<input name="title" required placeholder="Ej: Rendir bien en el trabajo este mes" /></label>
+                <label>Categoría<select name="category">
+                  <option value="ejercicio">💪 Ejercicio</option>
+                  <option value="trabajo">🧠 Trabajo</option>
+                  <option value="personal">🏠 Personal</option>
+                  <option value="financiero">💰 Financiero</option>
+                </select></label>
+                <label>Frecuencia<select name="frequency">
+                  <option value="unica">Una sola vez</option>
+                  <option value="semanal">Semanal (7 días)</option>
+                  <option value="quincenal">Quincenal (15 días)</option>
+                  <option value="mensual">Mensual</option>
+                </select></label>
+                <label class="toggle-label">
+                  <span>Repetitiva — se renueva automáticamente</span>
+                  <input type="checkbox" name="repetitive" id="goal-repetitive" class="toggle-check" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <label>Fecha límite<input name="deadline" type="date" /></label>
+                <label>Vincular automáticamente con
+                  <select name="linkedTo">
+                    <option value="">Sin vínculo (actualizo manual)</option>
+                    <option value="gym_days">💪 Gym — días asistidos</option>
+                    <option value="work_hours">🧠 Trabajo — horas trabajadas</option>
+                    <option value="work_sessions">🧠 Trabajo — sesiones completadas</option>
+                  </select>
+                </label>
+
+                <!-- Actividades previas a crear la meta -->
+                <div class="goal-preform-tasks">
+                  <div class="goal-preform-header">
+                    <span>Actividades de esta meta</span>
+                    <button class="goal-add-task-btn" id="goal-preform-add" type="button">+ Agregar</button>
+                  </div>
+                  <div id="goal-preform-list" class="goal-preform-task-list"></div>
+                  <div id="goal-preform-form" class="goal-task-add-form" style="display:none">
+                    <input class="goal-task-input" id="goal-preform-title" placeholder="Describe la actividad..." />
+                    <input type="date" class="goal-task-date-input" id="goal-preform-date" />
+                    <button class="primary-button goal-task-submit" id="goal-preform-submit" type="button">✓</button>
+                  </div>
+                </div>
+
+                <button class="primary-button" type="submit" style="margin-top:4px">Crear meta</button>
+              </form>
+
+              <!-- Lista de metas -->
+              <div id="goals-list" class="goals-grid"></div>
+            </div>
+          </div>
+
+          <!-- Estadísticas reales -->
+          <div id="perf-stats" class="org-panel hidden">
+            <div class="stats-two-col">
+
+              <div class="stats-col">
+                <h3 class="stats-section-title">💪 Ejercicio del mes</h3>
+                <div class="gym-header">
+                  <div class="gym-stat">
+                    <span class="gym-stat-num" id="gym-streak">0</span>
+                    <span class="gym-stat-label">Racha actual 🔥</span>
+                  </div>
+                  <div class="gym-stat">
+                    <span class="gym-stat-num" id="gym-week">0</span>
+                    <span class="gym-stat-label">Esta semana</span>
+                  </div>
+                  <div class="gym-stat">
+                    <span class="gym-stat-num" id="gym-month">0</span>
+                    <span class="gym-stat-label">Este mes</span>
+                  </div>
+                </div>
+                <div class="panel" style="margin-bottom:14px">
+                  <div class="panel-header">
+                    <h3>Registro del mes</h3>
+                    <button class="primary-button" id="gym-today-btn" type="button">✓ Marcar hoy</button>
+                  </div>
+                  <div id="gym-calendar" class="gym-calendar"></div>
+                </div>
+                <div class="panel">
+                  <div class="panel-header"><h3>Historial gym</h3></div>
+                  <div id="gym-list" class="item-list empty-space"></div>
+                </div>
               </div>
-              <label>
-                Titulo
-                <input name="title" required placeholder="Idea, pendiente, decision..." />
-              </label>
-              <label>
-                Etiqueta
-                <input name="tag" placeholder="Trabajo, vida, idea..." />
-              </label>
-              <label>
-                Contenido
-                <textarea name="body" required rows="7" placeholder="Escribe lo importante"></textarea>
-              </label>
-              <button class="primary-button" type="submit">Guardar nota</button>
-            </form>
-            <section class="panel list-panel">
-              <div class="panel-header">
-                <h3>Notas</h3>
-                <input id="note-search" class="search-input" placeholder="Buscar" />
+
+              <div class="stats-col">
+                <h3 class="stats-section-title">🧠 Trabajo del mes</h3>
+                <div class="gym-header" style="margin-bottom:14px">
+                  <div class="gym-stat">
+                    <span class="gym-stat-num" id="work-hours-week">0h</span>
+                    <span class="gym-stat-label">Esta semana</span>
+                  </div>
+                  <div class="gym-stat">
+                    <span class="gym-stat-num" id="work-hours-month">0h</span>
+                    <span class="gym-stat-label">Este mes</span>
+                  </div>
+                  <div class="gym-stat">
+                    <span class="gym-stat-num" id="work-sessions">0</span>
+                    <span class="gym-stat-label">Sesiones mes</span>
+                  </div>
+                </div>
+                <form id="worklog-form" class="panel form-panel" style="margin-bottom:14px">
+                  <div class="panel-header"><h3>Registrar sesión</h3></div>
+                  <label>Proyecto / tarea<input name="project" required placeholder="Nombre del proyecto..." /></label>
+                  <label>Horas<input name="hours" required type="number" min="0.5" step="0.5" max="24" placeholder="2" /></label>
+                  <label>Fecha<input name="date" required type="date" /></label>
+                  <label>Notas<textarea name="notes" rows="2" placeholder="¿Qué lograste?"></textarea></label>
+                  <button class="primary-button" type="submit">Registrar</button>
+                </form>
+                <div class="panel">
+                  <div class="panel-header"><h3>Historial trabajo</h3></div>
+                  <div id="worklog-list" class="item-list empty-space"></div>
+                </div>
               </div>
-              <div id="note-list" class="item-list empty-space"></div>
-            </section>
+
+            </div>
           </div>
         </section>
+
+        <!-- ══ CALENDARIO ══ -->
+        <section id="calendar" class="view" aria-labelledby="view-title">
+          <div class="cal-topbar">
+            <div class="cal-view-toggle">
+              <button class="cal-toggle-btn" id="cal-view-month" type="button">Mes</button>
+              <button class="cal-toggle-btn active" id="cal-view-week" type="button">Semana</button>
+            </div>
+            <div class="cal-nav">
+              <button class="cal-nav-btn" id="cal-prev" type="button">&#8592;</button>
+              <span id="cal-month-label"></span>
+              <button class="cal-nav-btn" id="cal-next" type="button">&#8594;</button>
+            </div>
+            <div id="gcal-status">
+              <button class="gcal-connect-btn" id="gcal-connect" type="button">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="15" height="15" alt="" />
+                Conectar Google
+              </button>
+              <span id="gcal-connected-label" class="gcal-connected-label" style="display:none">
+                <span class="gcal-dot"></span> Google conectado
+                <button class="gcal-unlink" id="gcal-disconnect" type="button">Desconectar</button>
+              </span>
+            </div>
+          </div>
+
+          <div class="cal-filters" id="cal-filters"></div>
+          <div id="ctx-manager" class="ctx-manager hidden"></div>
+
+          <div id="cal-month-view" class="hidden">
+            <div class="calendar-grid-header">
+              <span>Dom</span><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span>
+            </div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+          </div>
+
+          <div id="cal-week-view">
+            <div id="week-grid" class="week-grid"></div>
+          </div>
+
+          <div id="cal-day-detail" class="cal-day-detail hidden">
+            <div class="panel-header">
+              <h3 id="cal-detail-title">Detalle</h3>
+              <button class="secondary-button" id="cal-detail-close" type="button">Cerrar</button>
+            </div>
+            <div id="cal-detail-items" class="item-list"></div>
+          </div>
+        </section>
+
       </main>
     </div>
 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="app.js"></script>
   </body>
 </html>
