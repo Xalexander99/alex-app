@@ -57,9 +57,14 @@
             <h2 id="view-title">Inicio</h2>
           </div>
           <div class="topbar-actions">
+            <div class="global-search-wrap">
+              <input id="global-search" class="global-search-input" placeholder="🔍 Buscar..." autocomplete="off" />
+              <div id="global-search-results" class="global-search-results hidden"></div>
+            </div>
+            <button id="theme-toggle" class="secondary-button" type="button" title="Cambiar tema">🌙</button>
             <button id="notif-btn" class="secondary-button" type="button" title="Activar recordatorios">🔔</button>
             <button id="install-app" class="secondary-button hidden" type="button">Instalar</button>
-            <button id="seed-demo" class="secondary-button" type="button">Datos ejemplo</button>
+            <button id="seed-demo" class="secondary-button" type="button">Demo</button>
           </div>
         </header>
 
@@ -94,8 +99,8 @@
               <div id="today-tasks" class="item-list empty-space"></div>
             </section>
             <section class="panel">
-              <div class="panel-header"><h3>💰 Movimiento reciente</h3></div>
-              <div id="recent-finances" class="item-list empty-space"></div>
+              <div class="panel-header"><h3>📅 Resumen semanal</h3><span class="item-meta" id="week-range-label"></span></div>
+              <div id="weekly-summary" class="weekly-summary-grid"></div>
             </section>
             <section class="panel pomodoro-panel">
               <div class="panel-header"><h3>⏱️ Enfoque</h3><span id="pomo-mode-label" class="pomo-mode-badge">Trabajo</span></div>
@@ -257,6 +262,12 @@
                 <div id="budget-list" class="budget-list"></div>
               </div>
 
+              <!-- Proyección financiera -->
+              <div class="panel" style="grid-column:1/-1">
+                <div class="panel-header"><h3>📈 Proyección financiera</h3></div>
+                <div id="finance-projection" class="projection-grid"></div>
+              </div>
+
             </div>
           </div>
         </section>
@@ -358,6 +369,7 @@
         <section id="performance" class="view" aria-labelledby="view-title">
           <div class="org-tabs">
             <button class="org-tab active" data-perf="goals">🎯 Metas</button>
+            <button class="org-tab" data-perf="history">🏆 Historial</button>
             <button class="org-tab" data-perf="stats">📊 Estadísticas</button>
           </div>
 
@@ -375,6 +387,14 @@
               <!-- Formulario nueva meta -->
               <form id="goal-form" class="panel form-panel">
                 <div class="panel-header"><h3>Nueva meta</h3></div>
+                <div class="goal-templates">
+                  <span class="goal-templates-label">Plantillas rápidas:</span>
+                  <button class="goal-tpl-btn" data-tpl="gym" type="button">💪 Gym 3x/sem</button>
+                  <button class="goal-tpl-btn" data-tpl="work" type="button">🧠 Trabajo 40h/mes</button>
+                  <button class="goal-tpl-btn" data-tpl="save" type="button">💰 Ahorrar 20%</button>
+                  <button class="goal-tpl-btn" data-tpl="run" type="button">🏃 Correr 20km/mes</button>
+                  <button class="goal-tpl-btn" data-tpl="read" type="button">📚 Leer 1 libro</button>
+                </div>
                 <label>Título de la meta<input name="title" required placeholder="Ej: Rendir bien en el trabajo este mes" /></label>
                 <label>Categoría<select name="category">
                   <option value="ejercicio">💪 Ejercicio</option>
@@ -422,6 +442,14 @@
 
               <!-- Lista de metas -->
               <div id="goals-list" class="goals-grid"></div>
+            </div>
+          </div>
+
+          <!-- Historial de metas -->
+          <div id="perf-history" class="org-panel hidden">
+            <div class="panel">
+              <div class="panel-header"><h3>🏆 Metas completadas</h3><span id="history-count" class="item-meta"></span></div>
+              <div id="goals-history-list" class="goals-grid"></div>
             </div>
           </div>
 

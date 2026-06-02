@@ -100,7 +100,7 @@ function switchView(viewId) {
   renderContextSelects();
   renderGoalSelects();
   if (viewId === "calendar") renderCalendar();
-  if (viewId === "performance") { renderGoals(); renderGym(); renderWorkLog(); }
+  if (viewId === "performance") { renderGoals(); renderGoalHistory(); renderGym(); renderWorkLog(); }
   if (viewId === "meetings") { renderMeetings(); renderNotes(); }
   if (viewId === "organizer") renderTasks();
 }
@@ -132,6 +132,7 @@ function switchPerfTab(tabId) {
   $(`#perf-${tabId}`).classList.remove("hidden");
   if (tabId === "stats") { renderGym(); renderWorkLog(); }
   if (tabId === "goals") renderGoals();
+  if (tabId === "history") renderGoalHistory();
 }
 
 // ── Contexts ──
@@ -425,6 +426,8 @@ function sortTasks(a, b) {
 function renderTaskItem(task) {
   const el = document.createElement("article");
   el.className = `list-item ${task.done ? "done" : ""}`;
+  el.draggable = true;
+  el.dataset.taskId = task.id;
   const ctx = getContextById(task.context);
   const ctxLabel = ctx ? `${ctx.emoji} ${ctx.label}` : "";
   const ctxStyle = ctx ? `background:${ctx.bg};color:${ctx.color};border:1px solid ${ctx.dot}30` : "";
@@ -1128,6 +1131,7 @@ function render() {
   renderContextSelects();
   renderGoalSelects();
   renderDashboard();
+  renderWeeklySummary();
   renderFinances();
   renderTasks();
   renderMeetings();
@@ -1135,6 +1139,7 @@ function render() {
   renderGoals();
   renderGym();
   renderWorkLog();
+  pomoUpdateUI();
 }
 
 // ── Pre-form tasks (tasks added before creating the goal) ──
@@ -1167,6 +1172,13 @@ function bindEvents() {
   $("#task-filter")?.addEventListener("change", renderTasks);
   $("#task-goal-filter")?.addEventListener("change", renderTasks);
   $("#note-search")?.addEventListener("input", renderNotes);
+  $("#theme-toggle")?.addEventListener("click", toggleTheme);
+
+  // Goal templates
+  document.body.addEventListener("click", (e) => {
+    const tplBtn = e.target.closest(".goal-tpl-btn");
+    if (tplBtn) applyGoalTemplate(tplBtn.dataset.tpl);
+  });
 
   // Pre-form: toggle add form
   $("#goal-preform-add")?.addEventListener("click", () => {
@@ -1428,6 +1440,211 @@ function bindEvents() {
 }
 
 // ══════════════════════════════════════════
+// ── THEME ──
+// ══════════════════════════════════════════
+function initTheme() {
+  const saved = localStorage.getItem("alex-theme") || "dark";
+  document.documentElement.setAttribute("data-theme", saved);
+  updateThemeBtn(saved);
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("alex-theme", next);
+  updateThemeBtn(next);
+}
+function updateThemeBtn(theme) {
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = theme === "dark" ? "🌙" : "☀️";
+}
+
+// ══════════════════════════════════════════
+// ── GLOBAL SEARCH ──
+// ══════════════════════════════════════════
+function initGlobalSearch() {
+  const input = document.getElementById("global-search");
+  const results = document.getElementById("global-search-results");
+  if (!input || !results) return;
+
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    results.innerHTML = "";
+    if (q.length < 2) { results.classList.add("hidden"); return; }
+
+    const hits = [];
+    (state.tasks || []).forEach((t) => { if (`${t.title} ${t.body}`.toLowerCase().includes(q)) hits.push({ icon:"✅", label: t.title, sub: formatDate(t.dueDate), view:"organizer" }); });
+    (state.meetings || []).forEach((m) => { if (`${m.title} ${m.people}`.toLowerCase().includes(q)) hits.push({ icon:"🤝", label: m.title, sub: formatDate(m.date), view:"meetings" }); });
+    (state.notes || []).forEach((n) => { if (`${n.title} ${n.body} ${n.tag}`.toLowerCase().includes(q)) hits.push({ icon:"📝", label: n.title, sub: n.tag, view:"meetings" }); });
+    (state.goals || []).forEach((g) => { if (g.title.toLowerCase().includes(q)) hits.push({ icon:"🎯", label: g.title, sub: CAT_CONFIG[g.category]?.label || "", view:"performance" }); });
+    (state.finances || []).forEach((f) => { if (`${f.description} ${f.category}`.toLowerCase().includes(q)) hits.push({ icon: f.type==="income"?"💰":"💸", label: f.description, sub: formatMoney(f.amount), view:"finances" }); });
+
+    if (!hits.length) { results.innerHTML = `<div class="search-hit search-empty">Sin resultados</div>`; results.classList.remove("hidden"); return; }
+
+    hits.slice(0, 8).forEach((h) => {
+      const div = document.createElement("div");
+      div.className = "search-hit";
+      div.innerHTML = `<span class="search-icon">${h.icon}</span><span class="search-label">${escapeHTML(h.label)}</span><span class="search-sub">${escapeHTML(h.sub || "")}</span>`;
+      div.addEventListener("click", () => { switchView(h.view); input.value = ""; results.classList.add("hidden"); });
+      results.appendChild(div);
+    });
+    results.classList.remove("hidden");
+  });
+
+  document.addEventListener("click", (e) => { if (!e.target.closest(".global-search-wrap")) results.classList.add("hidden"); });
+  input.addEventListener("keydown", (e) => { if (e.key === "Escape") { input.value = ""; results.classList.add("hidden"); } });
+}
+
+// ══════════════════════════════════════════
+// ── WEEKLY SUMMARY ──
+// ══════════════════════════════════════════
+function renderWeeklySummary() {
+  const el = document.getElementById("weekly-summary");
+  const rangeEl = document.getElementById("week-range-label");
+  if (!el) return;
+
+  const now = new Date();
+  const sun = new Date(now); sun.setDate(now.getDate() - now.getDay());
+  const sat = new Date(sun); sat.setDate(sun.getDate() + 6);
+  const weekStart = sun.toISOString().slice(0,10);
+  const weekEnd = sat.toISOString().slice(0,10);
+
+  if (rangeEl) rangeEl.textContent = `${sun.toLocaleDateString("es-PE",{day:"numeric",month:"short"})} – ${sat.toLocaleDateString("es-PE",{day:"numeric",month:"short"})}`;
+
+  const tasksCompleted = (state.tasks||[]).filter((t) => t.done).length;
+  const tasksPending   = (state.tasks||[]).filter((t) => !t.done && t.dueDate <= weekEnd).length;
+  const gymDays        = (state.gym||[]).filter((g) => g.date >= weekStart && g.date <= weekEnd).length;
+  const workHours      = (state.workLogs||[]).filter((l) => l.date >= weekStart && l.date <= weekEnd).reduce((s,l) => s + Number(l.hours), 0);
+  const meetings       = (state.meetings||[]).filter((m) => m.date >= weekStart && m.date <= weekEnd).length;
+  const expenses       = (state.finances||[]).filter((f) => f.type==="expense" && f.date >= weekStart && f.date <= weekEnd).reduce((s,f) => s+f.amount, 0);
+
+  el.innerHTML = `
+    <div class="week-stat-card"><span class="week-stat-num">${tasksCompleted}</span><span class="week-stat-label">Tareas completadas</span></div>
+    <div class="week-stat-card"><span class="week-stat-num">${tasksPending}</span><span class="week-stat-label">Pendientes esta semana</span></div>
+    <div class="week-stat-card"><span class="week-stat-num">${gymDays}</span><span class="week-stat-label">Días de gym 💪</span></div>
+    <div class="week-stat-card"><span class="week-stat-num">${workHours}h</span><span class="week-stat-label">Horas trabajadas</span></div>
+    <div class="week-stat-card"><span class="week-stat-num">${meetings}</span><span class="week-stat-label">Reuniones</span></div>
+    <div class="week-stat-card"><span class="week-stat-num" style="color:var(--red)">${formatMoney(expenses)}</span><span class="week-stat-label">Gastos semana</span></div>`;
+}
+
+// ══════════════════════════════════════════
+// ── FINANCIAL PROJECTION ──
+// ══════════════════════════════════════════
+function renderProjection() {
+  const el = document.getElementById("finance-projection");
+  if (!el) return;
+  const jobIncome = (state.jobs||[]).reduce((s,j) => s + Number(j.amount||0), 0);
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const lastMonths = [-2,-1,0].map((i) => { const d=new Date(now.getFullYear(),now.getMonth()+i,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; });
+  const avgExpense = lastMonths.reduce((s,k) => s + (state.finances||[]).filter((f) => f.type==="expense" && f.date?.startsWith(k)).reduce((ss,f) => ss+f.amount, 0), 0) / 3;
+  const extraIncome = (state.finances||[]).filter((f) => f.type==="income" && f.date?.startsWith(curKey)).reduce((s,f) => s+f.amount, 0);
+  const totalIncome = jobIncome + extraIncome;
+  const monthlySave = totalIncome - avgExpense;
+  const saveRate = totalIncome > 0 ? Math.round((monthlySave/totalIncome)*100) : 0;
+
+  el.innerHTML = `
+    <div class="proj-card"><span class="proj-num">${formatMoney(totalIncome)}</span><span class="proj-label">Ingreso mensual</span></div>
+    <div class="proj-card"><span class="proj-num" style="color:var(--red)">${formatMoney(avgExpense)}</span><span class="proj-label">Gasto prom. 3 meses</span></div>
+    <div class="proj-card"><span class="proj-num" style="color:${monthlySave>=0?"var(--green)":"var(--red)"}">${formatMoney(monthlySave)}</span><span class="proj-label">Ahorro estimado/mes</span></div>
+    <div class="proj-card"><span class="proj-num" style="color:var(--blue)">${formatMoney(monthlySave*12)}</span><span class="proj-label">Proyección anual</span></div>
+    <div class="proj-card"><span class="proj-num">${saveRate}%</span><span class="proj-label">Tasa de ahorro</span></div>
+    <div class="proj-card"><span class="proj-num" style="color:var(--purple)">${formatMoney(monthlySave*6)}</span><span class="proj-label">Fondo 6 meses</span></div>`;
+}
+
+// ══════════════════════════════════════════
+// ── GOAL HISTORY ──
+// ══════════════════════════════════════════
+function renderGoalHistory() {
+  const el = document.getElementById("goals-history-list");
+  const countEl = document.getElementById("history-count");
+  if (!el) return;
+  const completed = (state.goals||[]).filter((g) => calcLinkedProgress(g) >= Number(g.target) && Number(g.target) > 0);
+  if (countEl) countEl.textContent = `${completed.length} completadas`;
+  if (!completed.length) { el.innerHTML = `<p class="empty-message">Aún no has completado ninguna meta. ¡Tú puedes!</p>`; return; }
+  el.innerHTML = "";
+  completed.forEach((g) => {
+    const cat = g.category || g.type || "personal";
+    const catInfo = CAT_CONFIG[cat] || { label: cat, color: "#999" };
+    const div = document.createElement("div");
+    div.className = "goal-card goal-done";
+    div.innerHTML = `
+      <div class="goal-header">
+        <div>
+          <span class="goal-cat-badge" style="color:${catInfo.color}">${catInfo.label}</span>
+          <p class="goal-title">${escapeHTML(g.title)}</p>
+          ${g.deadline ? `<p class="item-meta">📅 ${formatDate(g.deadline)}</p>` : ""}
+        </div>
+        <span class="goal-done-badge">✅ Completada</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:100%;background:var(--green)"></div></div>`;
+    el.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════
+// ── GOAL TEMPLATES ──
+// ══════════════════════════════════════════
+const GOAL_TEMPLATES = {
+  gym:  { title: "Ir al gym 3 veces por semana", category: "ejercicio", frequency: "semanal", repetitive: true, target: 3, unit: "días", linkedTo: "gym_days" },
+  work: { title: "Trabajar 40 horas este mes", category: "trabajo", frequency: "mensual", repetitive: true, target: 40, unit: "horas", linkedTo: "work_hours" },
+  save: { title: "Ahorrar 20% del sueldo", category: "financiero", frequency: "mensual", repetitive: true, target: 20, unit: "%", linkedTo: "" },
+  run:  { title: "Correr 20 km este mes", category: "ejercicio", frequency: "mensual", repetitive: false, target: 20, unit: "km", linkedTo: "" },
+  read: { title: "Leer 1 libro este mes", category: "personal", frequency: "mensual", repetitive: false, target: 1, unit: "libros", linkedTo: "" },
+};
+
+function applyGoalTemplate(key) {
+  const tpl = GOAL_TEMPLATES[key];
+  if (!tpl) return;
+  const form = document.getElementById("goal-form");
+  if (!form) return;
+  form.querySelector("[name='title']").value = tpl.title;
+  form.querySelector("[name='category']").value = tpl.category;
+  form.querySelector("[name='frequency']").value = tpl.frequency;
+  const repCheck = form.querySelector("[name='repetitive']");
+  if (repCheck) repCheck.checked = tpl.repetitive;
+  if (tpl.linkedTo) form.querySelector("[name='linkedTo']").value = tpl.linkedTo;
+  form.querySelector("[name='title']").focus();
+}
+
+// ══════════════════════════════════════════
+// ── DRAG & DROP TASKS ──
+// ══════════════════════════════════════════
+let dragSrcId = null;
+
+function bindDragDrop() {
+  document.body.addEventListener("dragstart", (e) => {
+    const item = e.target.closest(".list-item[draggable]");
+    if (!item) return;
+    dragSrcId = item.dataset.taskId;
+    item.classList.add("dragging");
+  });
+  document.body.addEventListener("dragend", (e) => {
+    document.querySelectorAll(".list-item.dragging").forEach((el) => el.classList.remove("dragging"));
+    document.querySelectorAll(".drag-over-item").forEach((el) => el.classList.remove("drag-over-item"));
+  });
+  document.body.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    const item = e.target.closest(".list-item[draggable]");
+    document.querySelectorAll(".drag-over-item").forEach((el) => el.classList.remove("drag-over-item"));
+    if (item && item.dataset.taskId !== dragSrcId) item.classList.add("drag-over-item");
+  });
+  document.body.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const target = e.target.closest(".list-item[draggable]");
+    if (!target || !dragSrcId || target.dataset.taskId === dragSrcId) return;
+    const tasks = state.tasks;
+    const srcIdx = tasks.findIndex((t) => t.id === dragSrcId);
+    const tgtIdx = tasks.findIndex((t) => t.id === target.dataset.taskId);
+    if (srcIdx < 0 || tgtIdx < 0) return;
+    const [moved] = tasks.splice(srcIdx, 1);
+    tasks.splice(tgtIdx, 0, moved);
+    saveState(); renderTasks();
+    dragSrcId = null;
+  });
+}
+
+// ══════════════════════════════════════════
 // ── POMODORO ──
 // ══════════════════════════════════════════
 function pomoFormatTime(s) {
@@ -1680,6 +1897,7 @@ function updateNotifBtn() {
 }
 
 // ── Init ──
+initTheme();
 $("#today-label").textContent = new Date().toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
 setDefaultDates();
 checkRepetitiveGoals();
@@ -1692,15 +1910,14 @@ bindGcalEvents();
 bindAttachments();
 bindPomodoro();
 bindBudget();
+bindDragDrop();
+initGlobalSearch();
 updateNotifBtn();
 if (Notification.permission === "granted") scheduleNotifications();
 
-// Notif button click
 document.getElementById("notif-btn")?.addEventListener("click", requestNotifPermission);
-
-// Fin tab → render summary when switching to it
 document.body.addEventListener("click", (e) => {
-  if (e.target.closest("[data-fin='summary']")) setTimeout(renderFinanceSummary, 50);
+  if (e.target.closest("[data-fin='summary']")) setTimeout(() => { renderFinanceSummary(); renderProjection(); }, 50);
 });
 
 render();
