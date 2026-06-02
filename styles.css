@@ -128,7 +128,7 @@ a { color: inherit; }
 .ghost-button:hover { border-color: var(--red); color: var(--red); }
 
 /* ══ WORKSPACE ══ */
-.workspace { padding: 28px 32px; overflow: hidden; }
+.workspace { padding: 28px 32px; overflow-x: hidden; overflow-y: auto; height: 100vh; }
 
 /* ══ TOPBAR ══ */
 .topbar {
@@ -1264,7 +1264,7 @@ textarea { resize: vertical; }
 
 @media (max-width: 700px) {
   .workspace { padding: 14px 12px 24px; }
-  .topbar { flex-direction: column; align-items: flex-start; }
+  .topbar { flex-direction: column; align-items: flex-start; margin: -14px -12px 18px; padding: 14px 12px; }
   .topbar-actions { width: 100%; }
   .metric-grid, .dashboard-grid, .content-grid, .worklog-grid { grid-template-columns: 1fr; }
   .week-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
@@ -1280,3 +1280,274 @@ textarea { resize: vertical; }
   .global-search-results { width: 260px; }
   .form-row-2 { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════
+   DESIGN REFRESH — Enhanced Visual Language
+   ══════════════════════════════════════════ */
+
+/* ── Enhanced Design Tokens ── */
+:root {
+  --radius:    16px;
+  --radius-sm: 10px;
+  --gradient-primary: linear-gradient(135deg, #e63946 0%, #b5121f 100%);
+  --gradient-surface: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 100%);
+  --easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.2s var(--easing);
+}
+
+/* ── Brand mark - premium gradient ── */
+.brand-mark {
+  background: var(--gradient-primary);
+  box-shadow: 0 4px 20px rgba(230,57,70,0.35);
+  border-radius: 12px;
+  font-size: 1.1rem;
+}
+
+/* ── Sidebar — richer surface ── */
+.sidebar {
+  background: linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 90%, var(--red) 10%) 100%);
+}
+
+/* ── Nav tabs — left-border active indicator ── */
+.nav-tab {
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  border-left: 3px solid transparent;
+}
+.nav-tab .nav-icon {
+  display: inline-block;
+  transition: transform var(--transition);
+  width: 20px; text-align: center;
+}
+.nav-tab:hover .nav-icon { transform: scale(1.18); }
+.nav-tab:hover { background: var(--surface-2); color: var(--ink); }
+.nav-tab.active {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: transparent;
+  border-left-color: var(--red);
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+/* ── Topbar — glassmorphism ── */
+.workspace { overflow: auto; }
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  background: rgba(12,12,12,0.82);
+  margin: -28px -32px 28px;
+  padding: 18px 32px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Primary button — gradient + lift ── */
+.primary-button {
+  background: var(--gradient-primary);
+  box-shadow: 0 4px 16px rgba(230,57,70,0.28);
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.01em;
+  transition: all var(--transition);
+}
+.primary-button:hover {
+  background: linear-gradient(135deg, #f04552 0%, #c1121f 100%);
+  box-shadow: 0 6px 24px rgba(230,57,70,0.44);
+  transform: translateY(-2px);
+}
+.primary-button:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(230,57,70,0.3); }
+
+/* ── Secondary / ghost buttons ── */
+.secondary-button { border-radius: var(--radius-sm); transition: all var(--transition); }
+.secondary-button:hover { background: var(--surface-3); box-shadow: var(--shadow-sm); }
+.ghost-button { border-radius: var(--radius-sm); transition: all var(--transition); }
+
+/* ── Progress bar — thicker + shimmer ── */
+.progress-bar { height: 8px; border-radius: 999px; }
+.progress-fill {
+  background: linear-gradient(90deg, var(--red) 0%, #f7704a 40%, var(--amber) 70%, var(--red) 100%);
+  background-size: 250% 100%;
+  animation: shimmer 3.5s linear infinite;
+  border-radius: 999px;
+}
+@keyframes shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ── Panels — top accent + rounded ── */
+.panel {
+  border-radius: var(--radius);
+  border-top: 2px solid rgba(230,57,70,0.25);
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.panel:hover { box-shadow: var(--shadow-sm); }
+.panel-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
+/* ── Metric cards — gradient bg ── */
+.metric-card {
+  border-radius: var(--radius);
+  background: var(--gradient-surface);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+  border-color: rgba(230,57,70,0.2);
+}
+.metric-card strong { font-size: 1.65rem; }
+
+/* ── List items — left glow accent on hover ── */
+.list-item {
+  border-radius: var(--radius-sm);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.list-item:hover {
+  border-color: var(--red);
+  transform: translateX(3px);
+  box-shadow: -3px 0 0 var(--red), var(--shadow-sm);
+}
+
+/* ── Forms ── */
+input, select, textarea {
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 3px rgba(230,57,70,0.14);
+}
+label { font-size: 0.73rem; letter-spacing: 0.07em; }
+
+/* ── Goal cards — top accent + rounded ── */
+.goal-card {
+  border-radius: var(--radius);
+  border-top: 3px solid var(--red);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.goal-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.3);
+}
+.goal-card.goal-done { border-top-color: var(--green); }
+
+/* ── Savings / investment ── */
+.savings-goal, .investment-card { border-radius: var(--radius); }
+.savings-goal:hover { box-shadow: var(--shadow-sm); }
+
+/* ── Weekly summary cards ── */
+.week-stat-card {
+  background: var(--gradient-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 10px;
+  transition: transform var(--transition);
+}
+.week-stat-card:hover { transform: translateY(-2px); }
+.week-stat-num { font-size: 1.65rem; font-weight: 900; }
+
+/* ── Projection cards ── */
+.proj-card {
+  background: var(--gradient-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  transition: transform var(--transition);
+}
+.proj-card:hover { transform: translateY(-2px); }
+.proj-num { font-size: 1.2rem; font-weight: 900; }
+
+/* ── Search dropdown ── */
+.global-search-results {
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  background: var(--surface);
+}
+.search-hit { transition: background var(--transition); }
+
+/* ── Org tabs — refined ── */
+.org-tab {
+  border-radius: 8px 8px 0 0;
+  transition: color var(--transition);
+}
+.org-tab.active {
+  background: rgba(230,57,70,0.06);
+}
+
+/* ── Goal category buttons ── */
+.goal-cat-btn {
+  border-radius: 999px;
+  transition: all var(--transition);
+  font-weight: 600;
+}
+
+/* ── Calendar ── */
+.cal-cell { border-radius: 10px; }
+.cal-nav-btn { border-radius: var(--radius-sm); transition: all var(--transition); }
+.cal-toggle-btn { transition: all var(--transition); }
+
+/* ── Gym days ── */
+.gym-day { border-radius: 9px; }
+.gym-day.went { box-shadow: 0 2px 10px rgba(230,57,70,0.22); }
+.gym-stat { border-radius: var(--radius); }
+
+/* ── Pomodoro ── */
+.pomo-ring-fill { stroke: url(#pomoGrad); }
+
+/* ── Toggle switch ── */
+.toggle-check:checked + .toggle-slider {
+  background: var(--gradient-primary);
+  box-shadow: 0 0 0 3px rgba(230,57,70,0.15);
+}
+
+/* ── Pills ── */
+.pill { border-radius: 999px; }
+
+/* ── Empty state ── */
+.empty-message { padding: 32px 24px; border-radius: var(--radius-sm); font-size: 0.86rem; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(230,57,70,0.5); }
+
+/* ── Priority badge refinement ── */
+.priority-badge { border-radius: 6px; letter-spacing: 0.02em; }
+
+/* ── Linked goal card ── */
+.linked-goal-card { border-radius: var(--radius); }
+
+/* ── Light theme — refined palette ── */
+:root[data-theme="light"] {
+  --bg:        #f5f5f7;
+  --surface:   #ffffff;
+  --surface-2: #f0f0f4;
+  --surface-3: #e8e8ee;
+  --line:      #d0d0da;
+  --muted:     #7a7a8a;
+  --shadow:    0 8px 32px rgba(0,0,0,0.10);
+  --shadow-sm: 0 2px 12px rgba(0,0,0,0.07);
+  --shadow-red:0 8px 32px rgba(230,57,70,0.15);
+  --red-soft:  rgba(230,57,70,0.08);
+  --red-glow:  rgba(230,57,70,0.15);
+  --gradient-surface: linear-gradient(160deg, #ffffff 0%, #f8f8fb 100%);
+}
+:root[data-theme="light"] .topbar {
+  background: rgba(245,245,247,0.88);
+  border-bottom-color: rgba(0,0,0,0.08);
+}
+:root[data-theme="light"] .sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #fdf5f5 100%);
+  box-shadow: 2px 0 24px rgba(0,0,0,0.06);
+}
+:root[data-theme="light"] .nav-tab:hover { background: var(--surface-3); }
+:root[data-theme="light"] .panel { background: #ffffff; }
+:root[data-theme="light"] .metric-card { background: linear-gradient(160deg, #ffffff 0%, #f8f8fb 100%); }
+:root[data-theme="light"] .goal-card { background: #ffffff; }
+:root[data-theme="light"] .list-item { background: #ffffff; }
+:root[data-theme="light"] .list-item:hover { background: #ffffff; }

@@ -115,8 +115,14 @@
               <div class="panel-header"><h3>⏱️ Enfoque</h3><span id="pomo-mode-label" class="pomo-mode-badge">Trabajo</span></div>
               <div class="pomo-ring-wrap">
                 <svg class="pomo-ring" viewBox="0 0 120 120">
+                  <defs>
+                    <linearGradient id="pomoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#e63946"/>
+                      <stop offset="100%" stop-color="#f4a261"/>
+                    </linearGradient>
+                  </defs>
                   <circle class="pomo-ring-bg" cx="60" cy="60" r="52"/>
-                  <circle class="pomo-ring-fill" id="pomo-ring-fill" cx="60" cy="60" r="52"/>
+                  <circle class="pomo-ring-fill" id="pomo-ring-fill" cx="60" cy="60" r="52" stroke="url(#pomoGrad)"/>
                 </svg>
                 <div class="pomo-time" id="pomo-time">25:00</div>
               </div>
