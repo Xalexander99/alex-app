@@ -17,8 +17,8 @@
         <div class="brand">
           <div class="brand-mark">A</div>
           <div>
-            <h1>Alex App</h1>
-            <p>Centro personal</p>
+            <h1 id="app-user-name">Alex App</h1>
+            <p class="brand-sub" id="brand-greeting">Centro personal</p>
           </div>
         </div>
 
@@ -44,8 +44,17 @@
         </nav>
 
         <div class="sidebar-footer">
+          <div class="name-edit-row">
+            <input id="user-name-input" class="name-input" placeholder="Tu nombre..." maxlength="30" />
+            <button id="user-name-save" class="ghost-button" type="button">✓</button>
+          </div>
           <p id="storage-status">Guardado local activo</p>
-          <button id="export-data" class="ghost-button" type="button">Exportar datos</button>
+          <div class="footer-btns">
+            <button id="export-data" class="ghost-button" type="button">⬇ Exportar</button>
+            <button id="import-data" class="ghost-button" type="button">⬆ Importar</button>
+            <input type="file" id="import-file" accept=".json" style="display:none" />
+          </div>
+          <button id="export-pdf" class="ghost-button" style="width:100%;margin-top:4px" type="button">📄 Exportar PDF</button>
         </div>
       </aside>
 
@@ -127,6 +136,8 @@
           <div class="org-tabs">
             <button class="org-tab active" data-fin="income">💰 Ingresos</button>
             <button class="org-tab" data-fin="expense">💸 Gastos</button>
+            <button class="org-tab" data-fin="debts">💳 Deudas</button>
+            <button class="org-tab" data-fin="recurring">🔄 Fijos</button>
             <button class="org-tab" data-fin="savings">🏦 Ahorro</button>
             <button class="org-tab" data-fin="investments">📈 Inversiones</button>
             <button class="org-tab" data-fin="summary">📊 Resumen</button>
@@ -186,6 +197,47 @@
               <section class="panel list-panel">
                 <div class="panel-header"><h3>Gastos</h3><span id="expense-summary"></span></div>
                 <div id="expense-list" class="item-list empty-space"></div>
+              </section>
+            </div>
+          </div>
+
+          <!-- Deudas -->
+          <div id="fin-debts" class="org-panel hidden">
+            <div class="content-grid">
+              <form id="debt-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nueva deuda</h3></div>
+                <label>Descripción<input name="name" required placeholder="Préstamo, tarjeta..." /></label>
+                <label>Tipo<select name="debtType">
+                  <option value="owed">Me deben a mí</option>
+                  <option value="owes">Yo le debo</option>
+                </select></label>
+                <label>Persona / entidad<input name="person" required placeholder="Juan, Banco..." /></label>
+                <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                <label>Fecha límite<input name="dueDate" type="date" /></label>
+                <label>Notas<textarea name="notes" rows="2" placeholder="Detalles del acuerdo..."></textarea></label>
+                <button class="primary-button" type="submit">Registrar</button>
+              </form>
+              <section class="panel list-panel">
+                <div class="panel-header"><h3>Deudas</h3><span id="debts-summary"></span></div>
+                <div id="debts-list" class="item-list empty-space"></div>
+              </section>
+            </div>
+          </div>
+
+          <!-- Gastos fijos recurrentes -->
+          <div id="fin-recurring" class="org-panel hidden">
+            <div class="content-grid">
+              <form id="recurring-form" class="panel form-panel">
+                <div class="panel-header"><h3>Nuevo gasto fijo</h3></div>
+                <label>Nombre<input name="name" required placeholder="Alquiler, Netflix, Internet..." /></label>
+                <label>Categoría<input name="category" required placeholder="Casa, entretenimiento..." /></label>
+                <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                <label>Día de cobro<input name="day" required type="number" min="1" max="31" placeholder="15" /></label>
+                <button class="primary-button" type="submit">Agregar</button>
+              </form>
+              <section class="panel list-panel">
+                <div class="panel-header"><h3>Gastos fijos</h3><span id="recurring-summary"></span></div>
+                <div id="recurring-list" class="item-list empty-space"></div>
               </section>
             </div>
           </div>
@@ -278,14 +330,36 @@
             <form id="task-form" class="panel form-panel">
               <div class="panel-header"><h3>Nueva tarea</h3></div>
               <label>Título<input name="title" required placeholder="¿Qué hay que hacer?" /></label>
-              <label>Contexto<select name="context"></select></label>
+              <div class="form-row-2">
+                <label>Prioridad<select name="priority">
+                  <option value="media">🟡 Media</option>
+                  <option value="alta">🔴 Alta</option>
+                  <option value="baja">🟢 Baja</option>
+                </select></label>
+                <label>Contexto<select name="context"></select></label>
+              </div>
               <label>Fecha límite<input name="dueDate" required type="date" /></label>
-              <label>Vincular a meta
-                <select name="goalId" id="task-goal-select">
-                  <option value="">Sin meta</option>
-                </select>
-              </label>
-              <label>Detalle<textarea name="body" rows="3" placeholder="Describe la tarea..."></textarea></label>
+              <div class="form-row-2">
+                <label>Vincular a meta<select name="goalId" id="task-goal-select"><option value="">Sin meta</option></select></label>
+                <label>Repetir<select name="recurrentFreq">
+                  <option value="">No repetir</option>
+                  <option value="diario">Diario</option>
+                  <option value="semanal">Semanal</option>
+                  <option value="mensual">Mensual</option>
+                </select></label>
+              </div>
+              <label>Detalle<textarea name="body" rows="2" placeholder="Describe la tarea..."></textarea></label>
+              <div class="subtask-preform">
+                <div class="subtask-preform-header">
+                  <span>Subtareas</span>
+                  <button type="button" class="goal-add-task-btn" id="subtask-add-btn">+ Agregar</button>
+                </div>
+                <div id="subtask-preform-form" class="goal-task-add-form" style="display:none">
+                  <input class="goal-task-input" id="subtask-title-input" placeholder="Subtarea..." />
+                  <button class="primary-button goal-task-submit" id="subtask-submit-btn" type="button">✓</button>
+                </div>
+                <div id="subtask-preform-list" class="goal-task-list"></div>
+              </div>
               <label class="attach-label">Adjuntar
                 <div class="attach-box" id="task-attach-box">
                   <input type="file" name="attachment" id="task-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple />
@@ -514,6 +588,51 @@
                   <div class="panel-header"><h3>Historial trabajo</h3></div>
                   <div id="worklog-list" class="item-list empty-space"></div>
                 </div>
+              </div>
+
+            </div>
+
+            <!-- Salud / Agua / Ánimo -->
+            <div class="stats-health-row">
+
+              <!-- Agua -->
+              <div class="panel health-panel">
+                <div class="panel-header"><h3>💧 Agua hoy</h3><span id="water-goal-label" class="item-meta">meta: 8 vasos</span></div>
+                <div class="water-display">
+                  <span class="water-count" id="water-count">0</span>
+                  <span class="water-unit">/ 8 vasos</span>
+                </div>
+                <div class="water-glasses" id="water-glasses"></div>
+                <div class="water-controls">
+                  <button class="primary-button" id="water-add" type="button">+ Vaso</button>
+                  <button class="pomo-btn-ghost pomo-btn" id="water-reset" type="button">↺</button>
+                </div>
+              </div>
+
+              <!-- Ánimo -->
+              <div class="panel health-panel">
+                <div class="panel-header"><h3>😊 Ánimo de hoy</h3></div>
+                <div class="mood-picker" id="mood-picker">
+                  <button class="mood-btn" data-mood="1" type="button">😞</button>
+                  <button class="mood-btn" data-mood="2" type="button">😕</button>
+                  <button class="mood-btn" data-mood="3" type="button">😐</button>
+                  <button class="mood-btn" data-mood="4" type="button">🙂</button>
+                  <button class="mood-btn" data-mood="5" type="button">😄</button>
+                </div>
+                <p class="mood-history-label">Últimos 7 días</p>
+                <div id="mood-history" class="mood-history"></div>
+              </div>
+
+              <!-- Salud -->
+              <div class="panel health-panel">
+                <div class="panel-header"><h3>❤️ Salud</h3></div>
+                <form id="health-form" class="health-form">
+                  <input name="weight" type="number" step="0.1" min="30" max="300" placeholder="Peso (kg)" />
+                  <input name="sleep" type="number" step="0.5" min="0" max="24" placeholder="Sueño (h)" />
+                  <input name="date" type="date" />
+                  <button class="primary-button" type="submit" style="grid-column:1/-1">Registrar</button>
+                </form>
+                <div id="health-list" class="item-list empty-space" style="margin-top:8px;max-height:140px;overflow-y:auto"></div>
               </div>
 
             </div>

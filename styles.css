@@ -1190,6 +1190,54 @@ textarea { resize: vertical; }
 .budget-amounts { font-size: 0.82rem; color: var(--muted); }
 .budget-amounts.over-budget { color: var(--red); font-weight: 700; }
 
+/* ══ SIDEBAR NAME ══ */
+.name-edit-row { display:flex; gap:6px; margin-bottom:6px; }
+.name-input {
+  flex:1; background:var(--surface-3); border:1px solid var(--line);
+  border-radius:7px; padding:5px 8px; color:var(--ink); font-size:0.8rem;
+}
+.name-input:focus { outline:none; border-color:var(--red); }
+.footer-btns { display:flex; gap:6px; }
+.footer-btns .ghost-button { flex:1; font-size:0.75rem; }
+
+/* ══ PRIORITY & RECUR BADGES ══ */
+.priority-badge, .recur-badge {
+  display:inline-flex; align-items:center;
+  border-radius:5px; padding:2px 8px;
+  font-size:0.72rem; font-weight:700;
+}
+.recur-badge { background:var(--surface-3); color:var(--muted); border:1px solid var(--line); }
+
+/* ══ SUBTASKS ══ */
+.subtasks-block { margin-top:6px; }
+.subtasks-progress { font-size:0.75rem; color:var(--muted); margin-bottom:4px; }
+.subtask-preform { background:var(--surface-3); border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:4px; }
+.subtask-preform-header { display:flex; justify-content:space-between; align-items:center; font-size:0.82rem; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
+
+/* ══ FORM ROW 2 ══ */
+.form-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+/* ══ HEALTH PANELS ══ */
+.stats-health-row { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:18px; }
+.health-panel { display:flex; flex-direction:column; gap:10px; }
+.water-display { display:flex; align-items:baseline; gap:6px; }
+.water-count { font-size:2.5rem; font-weight:800; color:var(--blue); line-height:1; }
+.water-unit { font-size:0.9rem; color:var(--muted); }
+.water-glasses { display:flex; flex-wrap:wrap; gap:4px; }
+.water-glass { font-size:1.2rem; filter:grayscale(1) opacity(0.3); transition:all 0.2s; }
+.water-glass.filled { filter:none; }
+.water-controls { display:flex; gap:8px; }
+.mood-picker { display:flex; gap:8px; justify-content:center; }
+.mood-btn { font-size:1.6rem; background:none; border:2px solid transparent; border-radius:50%; padding:4px; cursor:pointer; transition:all 0.15s; line-height:1; }
+.mood-btn:hover { transform:scale(1.2); }
+.mood-btn.mood-selected { border-color:var(--red); background:var(--red-soft); transform:scale(1.15); }
+.mood-history-label { font-size:0.75rem; color:var(--muted); }
+.mood-history { display:flex; gap:6px; }
+.mood-hist-day { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:0.72rem; color:var(--muted); }
+.health-form { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.health-form input { background:var(--surface-3); border:1px solid var(--line); border-radius:7px; padding:7px 10px; color:var(--ink); font-size:0.83rem; }
+.health-form input:focus { outline:none; border-color:var(--red); }
+
 /* ══ RESPONSIVE ══ */
 @media (max-width: 1100px) {
   .app-shell { grid-template-columns: 1fr; }
@@ -1223,10 +1271,12 @@ textarea { resize: vertical; }
   .calendar-grid { grid-template-columns: repeat(7, minmax(0,1fr)); }
   .gym-header { grid-template-columns: repeat(3,1fr); }
   .stats-two-col { grid-template-columns: 1fr; }
+  .stats-health-row { grid-template-columns: 1fr; }
   .summary-grid { grid-template-columns: 1fr; }
   .weekly-summary-grid { grid-template-columns: repeat(2,1fr); }
   .projection-grid { grid-template-columns: repeat(2,1fr); }
   .global-search-input { width: 160px; }
   .global-search-input:focus { width: 200px; }
   .global-search-results { width: 260px; }
+  .form-row-2 { grid-template-columns: 1fr; }
 }

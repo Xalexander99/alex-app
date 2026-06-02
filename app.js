@@ -36,6 +36,12 @@ const emptyState = {
     { id: "job2", name: "", amount: 0, payDay: 30 },
   ],
   budgets: {},
+  userName: "",
+  health: [],
+  water: {},
+  mood: {},
+  debts: [],
+  recurringExpenses: [],
 };
 
 let state = loadState();
@@ -439,6 +445,11 @@ function renderTaskItem(task) {
   // Goal badge
   const linkedGoal = task.goalId ? (state.goals || []).find((g) => g.id === task.goalId) : null;
   const goalBadge = linkedGoal ? `<span class="task-goal-badge">🎯 ${escapeHTML(linkedGoal.title)}</span>` : "";
+  const priorityColors = { alta: "#e63946", media: "#f4a261", baja: "#2ecc71" };
+  const priorityLabel = { alta: "Alta", media: "Media", baja: "Baja" };
+  const prio = task.priority || "media";
+  const prioBadge = `<span class="priority-badge" style="background:${priorityColors[prio]}22;color:${priorityColors[prio]};border:1px solid ${priorityColors[prio]}44">${priorityLabel[prio]}</span>`;
+  const recurBadge = task.recurrentFreq ? `<span class="recur-badge">🔄 ${task.recurrentFreq}</span>` : "";
 
   el.innerHTML = `
     <div class="item-main">
@@ -452,8 +463,10 @@ function renderTaskItem(task) {
       </div>
     </div>
     ${task.body ? `<p class="item-meta task-body">${escapeHTML(task.body)}</p>` : ""}
+    ${renderSubtasks(task)}
     ${attachHTML ? `<div class="task-attachments">${attachHTML}</div>` : ""}
     <div class="item-actions">
+      ${prioBadge}${recurBadge}
       <button class="secondary-button" data-toggle-task="${task.id}" type="button">${task.done ? "Reabrir" : "Completar"}</button>
       <button class="danger-button" data-delete="tasks" data-id="${task.id}" type="button">Eliminar</button>
     </div>`;
@@ -1130,15 +1143,22 @@ function exportData() {
 function render() {
   renderContextSelects();
   renderGoalSelects();
+  renderUserName();
   renderDashboard();
   renderWeeklySummary();
   renderFinances();
+  renderDebts();
+  renderRecurring();
   renderTasks();
   renderMeetings();
   renderNotes();
   renderGoals();
+  renderGoalHistory();
   renderGym();
   renderWorkLog();
+  renderWater();
+  renderMood();
+  renderHealth();
   pomoUpdateUI();
 }
 
@@ -1296,15 +1316,31 @@ function bindEvents() {
     }
 
     const delSaving = e.target.closest("[data-delete-saving]");
-    if (delSaving) {
-      state.savings = (state.savings || []).filter((s) => s.id !== delSaving.dataset.deleteSaving);
-      saveState(); renderSavings();
-    }
+    if (delSaving) { state.savings=(state.savings||[]).filter((s)=>s.id!==delSaving.dataset.deleteSaving); saveState(); renderSavings(); }
 
     const delInv = e.target.closest("[data-delete-inv]");
-    if (delInv) {
-      state.investments = (state.investments || []).filter((i) => i.id !== delInv.dataset.deleteInv);
-      saveState(); renderInvestments();
+    if (delInv) { state.investments=(state.investments||[]).filter((i)=>i.id!==delInv.dataset.deleteInv); saveState(); renderInvestments(); }
+
+    const delDebt = e.target.closest("[data-delete-debt]");
+    if (delDebt) { state.debts=(state.debts||[]).filter((d)=>d.id!==delDebt.dataset.deleteDebt); saveState(); renderDebts(); }
+
+    const settleDebt = e.target.closest("[data-settle-debt]");
+    if (settleDebt) { state.debts=(state.debts||[]).filter((d)=>d.id!==settleDebt.dataset.settleDebt); saveState(); renderDebts(); }
+
+    const delRecurring = e.target.closest("[data-delete-recurring]");
+    if (delRecurring) { state.recurringExpenses=(state.recurringExpenses||[]).filter((r)=>r.id!==delRecurring.dataset.deleteRecurring); saveState(); renderRecurring(); }
+
+    const delHealth = e.target.closest("[data-delete-health]");
+    if (delHealth) { state.health=(state.health||[]).filter((h)=>h.id!==delHealth.dataset.deleteHealth); saveState(); renderHealth(); }
+
+    const removeSubtask = e.target.closest("[data-remove-subtask]");
+    if (removeSubtask) { pendingSubtasks.splice(Number(removeSubtask.dataset.removeSubtask),1); renderSubtaskPreformList(); }
+
+    const toggleSubtask = e.target.closest("[data-toggle-subtask]");
+    if (toggleSubtask) {
+      const task = state.tasks.find((t) => t.id === toggleSubtask.dataset.toggleSubtask);
+      const sub = task?.subtasks?.find((s) => s.id === toggleSubtask.dataset.subtaskId);
+      if (sub) { sub.done = !sub.done; saveState(); renderTasks(); }
     }
 
     const deleteButton = e.target.closest("[data-delete]");
@@ -1319,7 +1355,18 @@ function bindEvents() {
     const toggleTask = e.target.closest("[data-toggle-task]");
     if (toggleTask) {
       const task = state.tasks.find((t) => t.id === toggleTask.dataset.toggleTask);
-      if (task) { task.done = !task.done; saveState(); render(); }
+      if (task) {
+        task.done = !task.done;
+        // Auto-create next occurrence for recurring tasks
+        if (task.done && task.recurrentFreq) {
+          const base = new Date(`${task.dueDate}T00:00:00`);
+          if (task.recurrentFreq === "diario")   base.setDate(base.getDate() + 1);
+          if (task.recurrentFreq === "semanal")  base.setDate(base.getDate() + 7);
+          if (task.recurrentFreq === "mensual")  base.setMonth(base.getMonth() + 1);
+          state.tasks.push({ ...task, id: uid(), done: false, dueDate: base.toISOString().slice(0,10), subtasks: (task.subtasks||[]).map((s) => ({...s, done: false})) });
+        }
+        saveState(); render();
+      }
     }
   });
 
@@ -1367,10 +1414,15 @@ function bindEvents() {
       title: data.title.trim(), body: (data.body || "").trim(),
       dueDate: data.dueDate, context: data.context || state.contexts[0]?.id,
       goalId: data.goalId || "",
+      priority: data.priority || "media",
+      recurrentFreq: data.recurrentFreq || "",
+      subtasks: pendingSubtasks.map((s) => ({...s})),
       attachments: pendingTaskAttachments.map((a) => ({ name: a.name, dataUrl: a.dataUrl, type: a.type })),
       done: false,
     };
     pendingTaskAttachments = [];
+    pendingSubtasks = [];
+    renderSubtaskPreformList();
     return item;
   }, "task");
 
@@ -1388,6 +1440,23 @@ function bindEvents() {
   handleSubmit("#worklog-form", "workLogs", (data) => ({
     project: data.project.trim(), hours: Number(data.hours),
     date: data.date, notes: (data.notes || "").trim(),
+  }));
+
+  handleSubmit("#debt-form", "debts", (data) => ({
+    name: data.name.trim(), debtType: data.debtType,
+    person: data.person.trim(), amount: Number(data.amount),
+    dueDate: data.dueDate || "", notes: (data.notes||"").trim(),
+  }));
+
+  handleSubmit("#recurring-form", "recurringExpenses", (data) => ({
+    name: data.name.trim(), category: data.category.trim(),
+    amount: Number(data.amount), day: Number(data.day),
+  }));
+
+  handleSubmit("#health-form", "health", (data) => ({
+    weight: data.weight ? Number(data.weight) : null,
+    sleep: data.sleep ? Number(data.sleep) : null,
+    date: data.date,
   }));
 
   // Goal form — custom submit (needs to also create pending tasks)
@@ -1436,6 +1505,282 @@ function bindEvents() {
     await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
     $("#install-app")?.classList.add("hidden");
+  });
+}
+
+// ══════════════════════════════════════════
+// ── USER NAME ──
+// ══════════════════════════════════════════
+function renderUserName() {
+  const name = state.userName || "";
+  const el = document.getElementById("app-user-name");
+  const greet = document.getElementById("brand-greeting");
+  const input = document.getElementById("user-name-input");
+  if (el) el.textContent = name ? `Hola, ${name} 👋` : "Alex App";
+  if (greet) greet.textContent = name ? "Centro personal" : "Centro personal";
+  if (input && !input.value) input.value = name;
+}
+function bindUserName() {
+  document.getElementById("user-name-save")?.addEventListener("click", () => {
+    const v = document.getElementById("user-name-input")?.value?.trim();
+    state.userName = v || "";
+    saveState(); renderUserName();
+  });
+  document.getElementById("user-name-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("user-name-save")?.click();
+  });
+}
+
+// ══════════════════════════════════════════
+// ── IMPORT / EXPORT PDF ──
+// ══════════════════════════════════════════
+function bindImportExport() {
+  document.getElementById("import-data")?.addEventListener("click", () => document.getElementById("import-file")?.click());
+  document.getElementById("import-file")?.addEventListener("change", (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (imported && typeof imported === "object") {
+          state = { ...emptyState, ...imported };
+          saveState(); render();
+          alert("✅ Datos importados correctamente.");
+        }
+      } catch { alert("❌ Archivo inválido."); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  document.getElementById("export-pdf")?.addEventListener("click", () => {
+    const today = new Date().toLocaleDateString("es-PE", { day:"numeric", month:"long", year:"numeric" });
+    const jobIncome = (state.jobs||[]).reduce((s,j) => s+Number(j.amount||0),0);
+    const expenses = (state.finances||[]).filter((f) => f.type==="expense").reduce((s,f) => s+f.amount,0);
+    const openTasks = (state.tasks||[]).filter((t) => !t.done).length;
+    const activeGoals = (state.goals||[]).length;
+
+    const win = window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Resumen Alex App</title>
+    <style>body{font-family:sans-serif;max-width:700px;margin:40px auto;color:#111}h1{color:#e63946}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{padding:8px 12px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5}.section{margin-top:28px}h2{color:#333;border-bottom:2px solid #e63946;padding-bottom:6px}</style>
+    </head><body>
+    <h1>📊 Resumen Alex App</h1><p>${today}</p>
+    <div class="section"><h2>💰 Finanzas</h2>
+    <table><tr><th>Ingresos fijos</th><td>${formatMoney(jobIncome)}</td></tr>
+    <tr><th>Gastos registrados</th><td>${formatMoney(expenses)}</td></tr>
+    <tr><th>Balance estimado</th><td>${formatMoney(jobIncome-expenses)}</td></tr></table></div>
+    <div class="section"><h2>✅ Actividades</h2>
+    <table><tr><th>Tareas pendientes</th><td>${openTasks}</td></tr>
+    <tr><th>Metas activas</th><td>${activeGoals}</td></tr></table></div>
+    <div class="section"><h2>💪 Gym este mes</h2><p>${(state.gym||[]).length} días registrados</p></div>
+    <div class="section"><h2>🎯 Metas</h2><table>${(state.goals||[]).slice(0,10).map((g)=>`<tr><td>${escapeHTML(g.title)}</td><td>${calcLinkedProgress(g)}/${g.target} ${escapeHTML(g.unit||"")}</td></tr>`).join("")}</table></div>
+    </body></html>`);
+    win.document.close(); win.print();
+  });
+}
+
+// ══════════════════════════════════════════
+// ── SUBTASKS ──
+// ══════════════════════════════════════════
+let pendingSubtasks = [];
+
+function renderSubtaskPreformList() {
+  const el = document.getElementById("subtask-preform-list");
+  if (!el) return;
+  el.innerHTML = "";
+  pendingSubtasks.forEach((s, i) => {
+    const div = document.createElement("div");
+    div.className = "goal-task-item";
+    div.innerHTML = `<span>⬜</span><span class="goal-task-label">${escapeHTML(s.title)}</span>
+      <button class="danger-button" data-remove-subtask="${i}" type="button" style="padding:2px 8px;font-size:0.72rem;min-height:unset">✕</button>`;
+    el.appendChild(div);
+  });
+}
+
+function bindSubtaskPreform() {
+  document.getElementById("subtask-add-btn")?.addEventListener("click", () => {
+    const f = document.getElementById("subtask-preform-form");
+    if (f) { f.style.display = f.style.display === "none" ? "flex" : "none"; document.getElementById("subtask-title-input")?.focus(); }
+  });
+  document.getElementById("subtask-submit-btn")?.addEventListener("click", () => {
+    const input = document.getElementById("subtask-title-input");
+    const title = input?.value?.trim(); if (!title) return;
+    pendingSubtasks.push({ id: uid(), title, done: false });
+    if (input) input.value = "";
+    renderSubtaskPreformList();
+  });
+  document.getElementById("subtask-title-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("subtask-submit-btn")?.click(); }
+  });
+}
+
+function renderSubtasks(task) {
+  if (!task.subtasks?.length) return "";
+  const items = task.subtasks.map((s) => `
+    <div class="subtask-item${s.done ? " done" : ""}">
+      <button class="goal-task-check" data-toggle-subtask="${task.id}" data-subtask-id="${s.id}" type="button">${s.done ? "✅" : "⬜"}</button>
+      <span class="goal-task-label">${escapeHTML(s.title)}</span>
+    </div>`).join("");
+  const done = task.subtasks.filter((s) => s.done).length;
+  return `<div class="subtasks-block">
+    <p class="subtasks-progress">${done}/${task.subtasks.length} subtareas</p>
+    <div class="goal-task-list">${items}</div></div>`;
+}
+
+// ══════════════════════════════════════════
+// ── DEBTS ──
+// ══════════════════════════════════════════
+function renderDebts() {
+  const list = document.getElementById("debts-list");
+  const summary = document.getElementById("debts-summary");
+  if (!list) return;
+  const debts = state.debts || [];
+  const iOwe = debts.filter((d) => d.debtType === "owes").reduce((s,d) => s+d.amount, 0);
+  const theyOwe = debts.filter((d) => d.debtType === "owed").reduce((s,d) => s+d.amount, 0);
+  if (summary) summary.textContent = `Me deben: ${formatMoney(theyOwe)} · Debo: ${formatMoney(iOwe)}`;
+  list.innerHTML = "";
+  if (!debts.length) { list.innerHTML = `<p class="empty-message">Sin deudas registradas.</p>`; return; }
+  debts.forEach((d) => {
+    const isOwe = d.debtType === "owes";
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `
+      <div class="item-main">
+        <div>
+          <p class="item-title">${isOwe ? "🔴" : "🟢"} ${escapeHTML(d.name)}</p>
+          <p class="item-meta">${isOwe ? "Le debo a" : "Me debe"}: ${escapeHTML(d.person)}${d.dueDate ? ` · Vence: ${formatDate(d.dueDate)}` : ""}</p>
+          ${d.notes ? `<p class="item-meta">${escapeHTML(d.notes)}</p>` : ""}
+        </div>
+        <span class="${isOwe ? "amount-expense" : "amount-income"}">${formatMoney(d.amount)}</span>
+      </div>
+      <div class="item-actions">
+        <button class="secondary-button" data-settle-debt="${d.id}" type="button">✓ Saldar</button>
+        <button class="danger-button" data-delete-debt="${d.id}" type="button">Eliminar</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════
+// ── RECURRING EXPENSES ──
+// ══════════════════════════════════════════
+function renderRecurring() {
+  const list = document.getElementById("recurring-list");
+  const summary = document.getElementById("recurring-summary");
+  if (!list) return;
+  const items = state.recurringExpenses || [];
+  const total = items.reduce((s,r) => s+r.amount, 0);
+  if (summary) summary.textContent = `Total fijo: ${formatMoney(total)}/mes`;
+  list.innerHTML = "";
+  if (!items.length) { list.innerHTML = `<p class="empty-message">Sin gastos fijos registrados.</p>`; return; }
+  items.forEach((r) => {
+    const today = new Date().getDate();
+    const daysUntil = r.day >= today ? r.day - today : (30 - today + r.day);
+    const soon = daysUntil <= 3;
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `
+      <div class="item-main">
+        <div>
+          <p class="item-title">${escapeHTML(r.name)} ${soon ? "⚠️" : ""}</p>
+          <p class="item-meta">${escapeHTML(r.category)} · Día ${r.day} de cada mes${soon ? ` · ¡En ${daysUntil} día${daysUntil!==1?"s":""}!` : ""}</p>
+        </div>
+        <span class="amount-expense">${formatMoney(r.amount)}</span>
+      </div>
+      <div class="item-actions">
+        <button class="danger-button" data-delete-recurring="${r.id}" type="button">Eliminar</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════
+// ── WATER ──
+// ══════════════════════════════════════════
+const WATER_GOAL = 8;
+function getWaterToday() { return (state.water || {})[todayISO()] || 0; }
+function renderWater() {
+  const count = getWaterToday();
+  const countEl = document.getElementById("water-count"); if (countEl) countEl.textContent = count;
+  const glassesEl = document.getElementById("water-glasses"); if (!glassesEl) return;
+  glassesEl.innerHTML = Array.from({length: WATER_GOAL}, (_,i) =>
+    `<span class="water-glass${i < count ? " filled" : ""}" title="Vaso ${i+1}">💧</span>`).join("");
+}
+function bindWater() {
+  document.getElementById("water-add")?.addEventListener("click", () => {
+    const today = todayISO(); state.water = state.water || {};
+    if ((state.water[today]||0) < WATER_GOAL*2) state.water[today] = (state.water[today]||0)+1;
+    saveState(); renderWater();
+  });
+  document.getElementById("water-reset")?.addEventListener("click", () => {
+    state.water = state.water || {}; state.water[todayISO()] = 0; saveState(); renderWater();
+  });
+}
+
+// ══════════════════════════════════════════
+// ── MOOD ──
+// ══════════════════════════════════════════
+const MOOD_EMOJI = { 1:"😞",2:"😕",3:"😐",4:"🙂",5:"😄" };
+function renderMood() {
+  const today = todayISO();
+  const todayMood = (state.mood||{})[today];
+  document.querySelectorAll(".mood-btn").forEach((btn) => {
+    btn.classList.toggle("mood-selected", todayMood && Number(btn.dataset.mood) === todayMood.score);
+  });
+  const hist = document.getElementById("mood-history"); if (!hist) return;
+  const last7 = Array.from({length:7},(_,i) => { const d=new Date(); d.setDate(d.getDate()-i); return d.toISOString().slice(0,10); }).reverse();
+  hist.innerHTML = last7.map((d) => {
+    const m = (state.mood||{})[d]; const day = new Date(`${d}T00:00:00`).toLocaleDateString("es-PE",{weekday:"short"});
+    return `<div class="mood-hist-day"><span>${day}</span><span>${m ? MOOD_EMOJI[m.score] : "·"}</span></div>`;
+  }).join("");
+}
+function bindMood() {
+  document.body.addEventListener("click", (e) => {
+    const btn = e.target.closest(".mood-btn");
+    if (!btn) return;
+    state.mood = state.mood || {};
+    state.mood[todayISO()] = { score: Number(btn.dataset.mood) };
+    saveState(); renderMood();
+  });
+}
+
+// ══════════════════════════════════════════
+// ── HEALTH ──
+// ══════════════════════════════════════════
+function renderHealth() {
+  const list = document.getElementById("health-list"); if (!list) return;
+  const items = [...(state.health||[])].sort((a,b) => b.date.localeCompare(a.date)).slice(0,10);
+  list.innerHTML = "";
+  if (!items.length) { list.innerHTML = `<p class="empty-message">Sin registros de salud.</p>`; return; }
+  items.forEach((h) => {
+    const div = document.createElement("div"); div.className = "list-item";
+    div.innerHTML = `<div class="item-main"><div>
+      <p class="item-title">${formatDate(h.date)}</p>
+      <p class="item-meta">${h.weight ? `⚖️ ${h.weight}kg` : ""}${h.sleep ? ` · 😴 ${h.sleep}h` : ""}</p>
+    </div><button class="danger-button" data-delete-health="${h.id}" type="button">✕</button></div>`;
+    list.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════
+// ── KEYBOARD SHORTCUTS ──
+// ══════════════════════════════════════════
+function bindKeyboardShortcuts() {
+  document.addEventListener("keydown", (e) => {
+    const tag = document.activeElement?.tagName;
+    if (["INPUT","TEXTAREA","SELECT"].includes(tag)) return;
+    if (e.ctrlKey || e.metaKey) {
+      switch(e.key) {
+        case "f": e.preventDefault(); document.getElementById("global-search")?.focus(); break;
+        case "1": e.preventDefault(); switchView("dashboard"); break;
+        case "2": e.preventDefault(); switchView("finances"); break;
+        case "3": e.preventDefault(); switchView("organizer"); break;
+        case "4": e.preventDefault(); switchView("meetings"); break;
+        case "5": e.preventDefault(); switchView("performance"); break;
+        case "6": e.preventDefault(); switchView("calendar"); break;
+      }
+    }
+    if (e.key === "Escape") { document.getElementById("global-search").value=""; document.getElementById("global-search-results")?.classList.add("hidden"); }
   });
 }
 
@@ -1911,6 +2256,12 @@ bindAttachments();
 bindPomodoro();
 bindBudget();
 bindDragDrop();
+bindUserName();
+bindImportExport();
+bindSubtaskPreform();
+bindWater();
+bindMood();
+bindKeyboardShortcuts();
 initGlobalSearch();
 updateNotifBtn();
 if (Notification.permission === "granted") scheduleNotifications();
