@@ -1031,6 +1031,76 @@ textarea { resize: vertical; }
   border-bottom: 1px solid var(--line);
 }
 
+/* ══ POMODORO ══ */
+.pomodoro-panel { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.pomo-ring-wrap {
+  position: relative; width: 140px; height: 140px;
+  display: flex; align-items: center; justify-content: center;
+}
+.pomo-ring { width: 140px; height: 140px; transform: rotate(-90deg); }
+.pomo-ring-bg { fill: none; stroke: var(--surface-3); stroke-width: 8; }
+.pomo-ring-fill {
+  fill: none; stroke: var(--red); stroke-width: 8;
+  stroke-linecap: round; transition: stroke-dashoffset 0.9s linear;
+}
+.pomo-time {
+  position: absolute; font-size: 1.8rem; font-weight: 800;
+  color: var(--ink); letter-spacing: -1px;
+}
+.pomo-mode-badge {
+  background: var(--red-soft); color: var(--red);
+  border: 1px solid rgba(230,57,70,0.3);
+  border-radius: 20px; padding: 2px 12px;
+  font-size: 0.75rem; font-weight: 700;
+}
+.pomo-mode-badge.pomo-break { background: rgba(46,204,113,0.1); color: var(--green); border-color: rgba(46,204,113,0.3); }
+.pomo-controls { display: flex; gap: 8px; }
+.pomo-btn {
+  padding: 8px 16px; border-radius: 8px;
+  background: var(--red); color: #fff; border: none;
+  font-weight: 600; font-size: 0.85rem; cursor: pointer;
+  transition: all 0.15s;
+}
+.pomo-btn:hover { background: var(--red-dark); }
+.pomo-btn-ghost {
+  background: var(--surface-3); color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.pomo-btn-ghost:hover { border-color: var(--red); color: var(--red); background: var(--surface-3); }
+.pomo-sessions { font-size: 0.82rem; color: var(--muted); }
+.pomo-focus-task {
+  font-size: 0.8rem; color: var(--ink-2); text-align: center;
+  padding: 6px 12px; background: var(--surface-3);
+  border-radius: 6px; width: 100%; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.pomo-focus-task:empty { display: none; }
+
+/* ══ FINANCE SUMMARY ══ */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.chart-wrap { height: 220px; position: relative; }
+.chart-wrap-sm { height: 200px; }
+.budget-add-form {
+  display: none; gap: 8px; align-items: center;
+  flex-wrap: wrap; margin-bottom: 12px;
+}
+.budget-add-form input {
+  background: var(--surface-3); border: 1px solid var(--line);
+  border-radius: 7px; padding: 7px 10px; color: var(--ink);
+  font-size: 0.85rem; flex: 1; min-width: 140px;
+}
+.budget-add-form input:focus { outline: none; border-color: var(--red); }
+.budget-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.budget-row { display: flex; flex-direction: column; gap: 2px; }
+.budget-row-header { display: flex; align-items: center; justify-content: space-between; }
+.budget-cat { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+.budget-amounts { font-size: 0.82rem; color: var(--muted); }
+.budget-amounts.over-budget { color: var(--red); font-weight: 700; }
+
 /* ══ RESPONSIVE ══ */
 @media (max-width: 1100px) {
   .app-shell { grid-template-columns: 1fr; }
@@ -1064,4 +1134,5 @@ textarea { resize: vertical; }
   .calendar-grid { grid-template-columns: repeat(7, minmax(0,1fr)); }
   .gym-header { grid-template-columns: repeat(3,1fr); }
   .stats-two-col { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: 1fr; }
 }

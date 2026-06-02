@@ -7,6 +7,7 @@
     <title>Alex App</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -56,6 +57,7 @@
             <h2 id="view-title">Inicio</h2>
           </div>
           <div class="topbar-actions">
+            <button id="notif-btn" class="secondary-button" type="button" title="Activar recordatorios">🔔</button>
             <button id="install-app" class="secondary-button hidden" type="button">Instalar</button>
             <button id="seed-demo" class="secondary-button" type="button">Datos ejemplo</button>
           </div>
@@ -95,9 +97,22 @@
               <div class="panel-header"><h3>💰 Movimiento reciente</h3></div>
               <div id="recent-finances" class="item-list empty-space"></div>
             </section>
-            <section class="panel">
-              <div class="panel-header"><h3>🎯 Metas</h3></div>
-              <div id="dash-goals" class="item-list empty-space"></div>
+            <section class="panel pomodoro-panel">
+              <div class="panel-header"><h3>⏱️ Enfoque</h3><span id="pomo-mode-label" class="pomo-mode-badge">Trabajo</span></div>
+              <div class="pomo-ring-wrap">
+                <svg class="pomo-ring" viewBox="0 0 120 120">
+                  <circle class="pomo-ring-bg" cx="60" cy="60" r="52"/>
+                  <circle class="pomo-ring-fill" id="pomo-ring-fill" cx="60" cy="60" r="52"/>
+                </svg>
+                <div class="pomo-time" id="pomo-time">25:00</div>
+              </div>
+              <div class="pomo-controls">
+                <button class="pomo-btn" id="pomo-start" type="button">▶ Iniciar</button>
+                <button class="pomo-btn pomo-btn-ghost" id="pomo-reset" type="button">↺ Reset</button>
+                <button class="pomo-btn pomo-btn-ghost" id="pomo-skip" type="button">⏭ Skip</button>
+              </div>
+              <div class="pomo-sessions" id="pomo-sessions">🍅 0 sesiones hoy</div>
+              <div class="pomo-focus-task" id="pomo-focus-task"></div>
             </section>
           </div>
         </section>
@@ -109,6 +124,7 @@
             <button class="org-tab" data-fin="expense">💸 Gastos</button>
             <button class="org-tab" data-fin="savings">🏦 Ahorro</button>
             <button class="org-tab" data-fin="investments">📈 Inversiones</button>
+            <button class="org-tab" data-fin="summary">📊 Resumen</button>
           </div>
 
           <!-- Ingresos -->
@@ -208,6 +224,39 @@
               <div>
                 <div id="investment-list" class="item-list"></div>
               </div>
+            </div>
+          </div>
+
+          <!-- Resumen -->
+          <div id="fin-summary" class="org-panel hidden">
+            <div class="summary-grid">
+
+              <!-- Gráfico ingresos vs gastos -->
+              <div class="panel">
+                <div class="panel-header"><h3>📈 Ingresos vs Gastos</h3><span id="chart-period-label" class="item-meta"></span></div>
+                <div class="chart-wrap"><canvas id="chart-bar"></canvas></div>
+              </div>
+
+              <!-- Gráfico por categoría -->
+              <div class="panel">
+                <div class="panel-header"><h3>🥧 Gastos por categoría</h3><span class="item-meta" id="chart-month-label"></span></div>
+                <div class="chart-wrap chart-wrap-sm"><canvas id="chart-donut"></canvas></div>
+              </div>
+
+              <!-- Presupuesto mensual -->
+              <div class="panel" style="grid-column:1/-1">
+                <div class="panel-header">
+                  <h3>🎯 Presupuesto mensual</h3>
+                  <button class="secondary-button" id="budget-add-btn" type="button">+ Categoría</button>
+                </div>
+                <div id="budget-add-form" class="budget-add-form" style="display:none">
+                  <input id="budget-cat-input" placeholder="Categoría (ej: Comida)" />
+                  <input id="budget-amount-input" type="number" min="0" step="0.01" placeholder="Presupuesto S/" />
+                  <button class="primary-button" id="budget-save-btn" type="button">Guardar</button>
+                </div>
+                <div id="budget-list" class="budget-list"></div>
+              </div>
+
             </div>
           </div>
         </section>

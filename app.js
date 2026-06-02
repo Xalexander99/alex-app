@@ -35,10 +35,25 @@ const emptyState = {
     { id: "job1", name: "", amount: 0, payDay: 15 },
     { id: "job2", name: "", amount: 0, payDay: 30 },
   ],
+  budgets: {},
 };
 
 let state = loadState();
 let deferredInstallPrompt = null;
+
+// ── Pomodoro state ──
+const POMO_WORK = 25 * 60;
+const POMO_BREAK = 5 * 60;
+const POMO_LONG = 15 * 60;
+let pomoMode = "work";   // "work" | "break" | "long"
+let pomoTime = POMO_WORK;
+let pomoInterval = null;
+let pomoRunning = false;
+let pomoSessions = 0;    // completed work sessions today
+
+// ── Chart instances ──
+let chartBar = null;
+let chartDonut = null;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -1412,10 +1427,262 @@ function bindEvents() {
   });
 }
 
+// ══════════════════════════════════════════
+// ── POMODORO ──
+// ══════════════════════════════════════════
+function pomoFormatTime(s) {
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function pomoUpdateUI() {
+  const timeEl = $("#pomo-time"); if (timeEl) timeEl.textContent = pomoFormatTime(pomoTime);
+  const startEl = $("#pomo-start"); if (startEl) startEl.textContent = pomoRunning ? "⏸ Pausar" : "▶ Iniciar";
+  const modeEl = $("#pomo-mode-label");
+  if (modeEl) {
+    modeEl.textContent = pomoMode === "work" ? "Trabajo" : pomoMode === "break" ? "Descanso" : "Descanso largo";
+    modeEl.className = `pomo-mode-badge${pomoMode !== "work" ? " pomo-break" : ""}`;
+  }
+  const sessEl = $("#pomo-sessions");
+  if (sessEl) sessEl.textContent = `🍅 ${pomoSessions} sesión${pomoSessions !== 1 ? "es" : ""} hoy`;
+
+  const total = pomoMode === "work" ? POMO_WORK : pomoMode === "break" ? POMO_BREAK : POMO_LONG;
+  const pct = pomoTime / total;
+  const circumference = 2 * Math.PI * 52;
+  const fill = $("#pomo-ring-fill");
+  if (fill) { fill.style.strokeDasharray = circumference; fill.style.strokeDashoffset = circumference * (1 - pct); }
+
+  const focusEl = $("#pomo-focus-task");
+  if (focusEl) {
+    const topTask = [...(state.tasks || [])].filter((t) => !t.done).sort(sortTasks)[0];
+    focusEl.textContent = topTask ? `📌 ${topTask.title}` : "";
+  }
+}
+
+function pomoTick() {
+  pomoTime--;
+  if (pomoTime <= 0) {
+    clearInterval(pomoInterval); pomoRunning = false;
+    if (pomoMode === "work") {
+      pomoSessions++;
+      sendNotification("🍅 Pomodoro completado", "¡Tómate un descanso!");
+      pomoMode = pomoSessions % 4 === 0 ? "long" : "break";
+      pomoTime = pomoSessions % 4 === 0 ? POMO_LONG : POMO_BREAK;
+    } else {
+      sendNotification("⏱️ Descanso terminado", "¡A trabajar!");
+      pomoMode = "work"; pomoTime = POMO_WORK;
+    }
+  }
+  pomoUpdateUI();
+}
+
+function bindPomodoro() {
+  $("#pomo-start")?.addEventListener("click", () => {
+    if (pomoRunning) { clearInterval(pomoInterval); pomoRunning = false; }
+    else { pomoInterval = setInterval(pomoTick, 1000); pomoRunning = true; }
+    pomoUpdateUI();
+  });
+  $("#pomo-reset")?.addEventListener("click", () => {
+    clearInterval(pomoInterval); pomoRunning = false;
+    pomoTime = pomoMode === "work" ? POMO_WORK : pomoMode === "break" ? POMO_BREAK : POMO_LONG;
+    pomoUpdateUI();
+  });
+  $("#pomo-skip")?.addEventListener("click", () => {
+    clearInterval(pomoInterval); pomoRunning = false;
+    if (pomoMode === "work") {
+      pomoSessions++;
+      pomoMode = pomoSessions % 4 === 0 ? "long" : "break";
+      pomoTime = pomoSessions % 4 === 0 ? POMO_LONG : POMO_BREAK;
+    } else { pomoMode = "work"; pomoTime = POMO_WORK; }
+    pomoUpdateUI();
+  });
+  pomoUpdateUI();
+}
+
+// ══════════════════════════════════════════
+// ── FINANCE SUMMARY ──
+// ══════════════════════════════════════════
+function renderFinanceSummary() {
+  if (!document.getElementById("fin-summary") || document.getElementById("fin-summary").classList.contains("hidden")) return;
+
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ label: d.toLocaleDateString("es-PE", { month: "short" }), key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` });
+  }
+
+  const jobMonthly = (state.jobs || []).reduce((s, j) => s + (Number(j.amount) || 0), 0);
+  const incomes = months.map((m) => {
+    const extra = (state.finances || []).filter((f) => f.type === "income" && f.date?.startsWith(m.key)).reduce((s, f) => s + f.amount, 0);
+    return extra + jobMonthly;
+  });
+  const expenses = months.map((m) =>
+    (state.finances || []).filter((f) => f.type === "expense" && f.date?.startsWith(m.key)).reduce((s, f) => s + f.amount, 0)
+  );
+
+  const barCtx = document.getElementById("chart-bar");
+  if (barCtx && typeof Chart !== "undefined") {
+    if (chartBar) chartBar.destroy();
+    chartBar = new Chart(barCtx, {
+      type: "bar",
+      data: {
+        labels: months.map((m) => m.label),
+        datasets: [
+          { label: "Ingresos", data: incomes, backgroundColor: "rgba(46,204,113,0.75)", borderRadius: 6 },
+          { label: "Gastos",   data: expenses, backgroundColor: "rgba(230,57,70,0.75)", borderRadius: 6 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#bbbbbb" } } },
+        scales: {
+          x: { ticks: { color: "#888" }, grid: { color: "#2a2a2a" } },
+          y: { ticks: { color: "#888", callback: (v) => `S/${v}` }, grid: { color: "#2a2a2a" } },
+        },
+      },
+    });
+  }
+
+  const curKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const ml = document.getElementById("chart-month-label");
+  if (ml) ml.textContent = now.toLocaleDateString("es-PE", { month: "long", year: "numeric" });
+
+  const monthExpenses = (state.finances || []).filter((f) => f.type === "expense" && f.date?.startsWith(curKey));
+  const catMap = {};
+  monthExpenses.forEach((f) => { const k = f.category || "Otro"; catMap[k] = (catMap[k] || 0) + f.amount; });
+  const catLabels = Object.keys(catMap);
+  const catValues = Object.values(catMap);
+  const palette = ["#e63946","#4dabf7","#2ecc71","#f4a261","#9775fa","#f472b6","#38bdf8","#a3e635"];
+
+  const donutCtx = document.getElementById("chart-donut");
+  if (donutCtx && typeof Chart !== "undefined") {
+    if (chartDonut) chartDonut.destroy();
+    if (catLabels.length) {
+      chartDonut = new Chart(donutCtx, {
+        type: "doughnut",
+        data: { labels: catLabels, datasets: [{ data: catValues, backgroundColor: palette.slice(0, catLabels.length), borderWidth: 0 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "right", labels: { color: "#bbbbbb", padding: 12, font: { size: 12 } } } },
+          cutout: "65%",
+        },
+      });
+    } else {
+      donutCtx.parentElement.innerHTML = `<p class="empty-message" style="padding:40px 0">Sin gastos este mes.</p>`;
+    }
+  }
+
+  renderBudgets();
+}
+
+function renderBudgets() {
+  const list = document.getElementById("budget-list");
+  if (!list) return;
+  const budgets = state.budgets || {};
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const monthExpenses = (state.finances || []).filter((f) => f.type === "expense" && f.date?.startsWith(curKey));
+
+  list.innerHTML = "";
+  const cats = Object.keys(budgets);
+  if (!cats.length) {
+    list.innerHTML = `<p class="empty-message">Agrega una categoría para ver tu presupuesto mensual.</p>`;
+    return;
+  }
+  cats.forEach((cat) => {
+    const budget = Number(budgets[cat]);
+    const spent = monthExpenses.filter((f) => (f.category || "Otro") === cat).reduce((s, f) => s + f.amount, 0);
+    const pct = Math.min(100, Math.round((spent / budget) * 100));
+    const over = spent > budget;
+    const div = document.createElement("div");
+    div.className = "budget-row";
+    div.innerHTML = `
+      <div class="budget-row-header">
+        <span class="budget-cat">${escapeHTML(cat)}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="budget-amounts${over ? " over-budget" : ""}">${formatMoney(spent)} / ${formatMoney(budget)}</span>
+          <button class="danger-button" data-delete-budget="${escapeHTML(cat)}" type="button" style="padding:2px 8px;font-size:0.72rem;min-height:unset">✕</button>
+        </div>
+      </div>
+      <div class="progress-bar" style="margin:6px 0 2px">
+        <div class="progress-fill" style="width:${pct}%;background:${over ? "var(--red)" : pct > 80 ? "var(--amber)" : "var(--green)"}"></div>
+      </div>
+      <p class="item-meta">${pct}% usado${over ? " · ⚠️ Excedido" : ""}</p>`;
+    list.appendChild(div);
+  });
+}
+
+function bindBudget() {
+  document.getElementById("budget-add-btn")?.addEventListener("click", () => {
+    const f = document.getElementById("budget-add-form");
+    if (f) f.style.display = f.style.display === "none" ? "flex" : "none";
+  });
+  document.getElementById("budget-save-btn")?.addEventListener("click", () => {
+    const cat = document.getElementById("budget-cat-input")?.value?.trim();
+    const amt = Number(document.getElementById("budget-amount-input")?.value);
+    if (!cat || !amt) return;
+    state.budgets = state.budgets || {};
+    state.budgets[cat] = amt;
+    document.getElementById("budget-cat-input").value = "";
+    document.getElementById("budget-amount-input").value = "";
+    const f = document.getElementById("budget-add-form"); if (f) f.style.display = "none";
+    saveState(); renderBudgets();
+  });
+  document.body.addEventListener("click", (e) => {
+    const delBudget = e.target.closest("[data-delete-budget]");
+    if (delBudget) { delete state.budgets[delBudget.dataset.deleteBudget]; saveState(); renderBudgets(); }
+  });
+}
+
+// ══════════════════════════════════════════
+// ── NOTIFICATIONS ──
+// ══════════════════════════════════════════
+function sendNotification(title, body) {
+  if (Notification.permission === "granted") new Notification(title, { body, icon: "/icon-192.png" });
+}
+
+function requestNotifPermission() {
+  if (!("Notification" in window)) return;
+  Notification.requestPermission().then((perm) => {
+    updateNotifBtn();
+    if (perm === "granted") scheduleNotifications();
+  });
+}
+
+function scheduleNotifications() {
+  if (Notification.permission !== "granted") return;
+  const today = todayISO();
+  const now = new Date();
+  const dueTasks = (state.tasks || []).filter((t) => !t.done && t.dueDate <= today);
+  if (dueTasks.length) {
+    setTimeout(() => sendNotification(
+      `📋 ${dueTasks.length} tarea${dueTasks.length > 1 ? "s" : ""} pendiente${dueTasks.length > 1 ? "s" : ""}`,
+      dueTasks.slice(0, 3).map((t) => t.title).join(", ")
+    ), 3000);
+  }
+  (state.meetings || []).forEach((m) => {
+    if (m.date !== today || !m.time) return;
+    const [h, min] = m.time.split(":").map(Number);
+    const meetingMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min).getTime();
+    const diff = meetingMs - now.getTime() - 10 * 60 * 1000;
+    if (diff > 0 && diff < 3600000) setTimeout(() => sendNotification("🤝 Reunión en 10 min", m.title), diff);
+  });
+}
+
+function updateNotifBtn() {
+  const btn = document.getElementById("notif-btn");
+  if (!btn) return;
+  if (!("Notification" in window)) { btn.style.display = "none"; return; }
+  const granted = Notification.permission === "granted";
+  btn.textContent = granted ? "🔔" : "🔕";
+  btn.title = granted ? "Recordatorios activos" : "Activar recordatorios";
+  btn.style.opacity = granted ? "1" : "0.6";
+}
+
 // ── Init ──
 $("#today-label").textContent = new Date().toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
 setDefaultDates();
-checkRepetitiveGoals(); // auto-renew repetitive goals if expired
+checkRepetitiveGoals();
 gcalLoadToken();
 gcalUpdateUI();
 if (gcalIsConnected()) gcalFetchEvents();
@@ -1423,6 +1690,19 @@ bindEvents();
 bindCalendarEvents();
 bindGcalEvents();
 bindAttachments();
+bindPomodoro();
+bindBudget();
+updateNotifBtn();
+if (Notification.permission === "granted") scheduleNotifications();
+
+// Notif button click
+document.getElementById("notif-btn")?.addEventListener("click", requestNotifPermission);
+
+// Fin tab → render summary when switching to it
+document.body.addEventListener("click", (e) => {
+  if (e.target.closest("[data-fin='summary']")) setTimeout(renderFinanceSummary, 50);
+});
+
 render();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
