@@ -1281,6 +1281,74 @@ textarea { resize: vertical; }
   .form-row-2 { grid-template-columns: 1fr; }
 }
 
+/* ══ RECEIPT SCANNER ══ */
+.receipt-scanner-wrap {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 4px;
+}
+.receipt-upload-label {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 12px;
+  cursor: pointer;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: 0.85rem; font-weight: 600;
+  transition: all 0.2s;
+  text-align: center;
+  user-select: none;
+}
+.receipt-upload-label:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
+.receipt-upload-icon { font-size: 1.3rem; }
+.receipt-preview-wrap { position: relative; display: inline-block; width: 100%; }
+.receipt-preview-img {
+  width: 100%; max-height: 200px; object-fit: cover;
+  border-radius: var(--radius-sm); border: 1px solid var(--line); display: block;
+}
+.receipt-clear-btn {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,0.7); color: #fff;
+  border: none; border-radius: 50%;
+  width: 24px; height: 24px;
+  font-size: 0.75rem; cursor: pointer;
+  display: grid; place-items: center; transition: background 0.15s;
+}
+.receipt-clear-btn:hover { background: var(--red); }
+.receipt-ocr-status {
+  font-size: 0.82rem; color: var(--muted);
+  padding: 6px 10px; background: var(--surface-3);
+  border-radius: 6px; text-align: center;
+  animation: pulse-opacity 1.2s ease-in-out infinite;
+}
+@keyframes pulse-opacity { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+.receipt-ocr-result {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  background: rgba(46,204,113,0.08);
+  border: 1px solid rgba(46,204,113,0.25);
+  border-radius: 8px; font-size: 0.82rem;
+}
+.receipt-ocr-badge { font-size: 0.78rem; font-weight: 700; color: var(--green); white-space: nowrap; }
+.receipt-ocr-chip {
+  background: var(--surface-3); border: 1px solid var(--line);
+  border-radius: 6px; padding: 2px 10px;
+  font-size: 0.8rem; font-weight: 700; color: var(--ink); white-space: nowrap;
+}
+.receipt-thumb-wrap { position: relative; flex-shrink: 0; display: inline-block; text-decoration: none; }
+.receipt-thumb {
+  width: 44px; height: 44px; object-fit: cover;
+  border-radius: 6px; border: 1px solid var(--line);
+  transition: transform 0.15s; display: block;
+}
+.receipt-thumb:hover { transform: scale(1.08); }
+.receipt-thumb-badge {
+  position: absolute; bottom: -4px; right: -4px;
+  font-size: 0.65rem; background: var(--surface);
+  border-radius: 50%; width: 16px; height: 16px;
+  display: grid; place-items: center; border: 1px solid var(--line);
+}
+
 /* ══════════════════════════════════════════
    DESIGN REFRESH — Enhanced Visual Language
    ══════════════════════════════════════════ */

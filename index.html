@@ -8,6 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -194,6 +195,24 @@
             <div class="content-grid">
               <form id="expense-form" class="panel form-panel">
                 <div class="panel-header"><h3>Nuevo gasto</h3></div>
+
+                <!-- Receipt scanner -->
+                <div class="receipt-scanner-wrap">
+                  <label class="receipt-upload-label" id="receipt-upload-label" for="receipt-file-input">
+                    <span class="receipt-upload-icon">📷</span>
+                    <span id="receipt-upload-text">Escanear recibo / foto</span>
+                  </label>
+                  <input type="file" id="receipt-file-input" accept="image/*" capture="environment" style="display:none" />
+                  <div id="receipt-preview-wrap" class="receipt-preview-wrap hidden">
+                    <img id="receipt-preview-img" class="receipt-preview-img" alt="Recibo" />
+                    <button type="button" id="receipt-clear-btn" class="receipt-clear-btn" title="Quitar foto">✕</button>
+                  </div>
+                  <div id="receipt-ocr-status" class="receipt-ocr-status hidden"></div>
+                  <div id="receipt-ocr-result" class="receipt-ocr-result hidden">
+                    <span class="receipt-ocr-badge">🤖 Detectado automáticamente</span>
+                  </div>
+                </div>
+
                 <label>Descripción<input name="description" required placeholder="Alquiler, comida..." /></label>
                 <label>Categoría<input name="category" required placeholder="Casa, comida, salud..." /></label>
                 <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>

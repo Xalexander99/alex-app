@@ -541,11 +541,20 @@ function renderNoteItem(note) {
 function renderFinanceItem(item) {
   const el = document.createElement("article");
   el.className = "list-item";
+  const receiptThumb = item.receiptDataUrl
+    ? `<a href="${item.receiptDataUrl}" target="_blank" title="Ver recibo" class="receipt-thumb-wrap">
+         <img src="${item.receiptDataUrl}" class="receipt-thumb" alt="Recibo" />
+         <span class="receipt-thumb-badge">🧾</span>
+       </a>`
+    : "";
   el.innerHTML = `
     <div class="item-main">
-      <div>
-        <p class="item-title">${escapeHTML(item.description)}</p>
-        <p class="item-meta">${escapeHTML(item.category || "")} · ${formatDate(item.date)}</p>
+      <div style="display:flex;align-items:center;gap:10px;flex:1">
+        ${receiptThumb}
+        <div>
+          <p class="item-title">${escapeHTML(item.description)}</p>
+          <p class="item-meta">${escapeHTML(item.category || "")} · ${formatDate(item.date)}</p>
+        </div>
       </div>
       <span class="${item.type === "income" ? "amount-income" : "amount-expense"}">
         ${item.type === "income" ? "+" : "-"}${formatMoney(item.amount)}
@@ -1403,7 +1412,16 @@ function bindEvents() {
     type: "expense",
     description: data.description.trim(), category: data.category.trim(),
     amount: Number(data.amount), date: data.date,
+    receiptDataUrl: window._pendingReceiptDataUrl || null,
   }));
+
+  // Clear receipt after submit
+  document.querySelector("#expense-form")?.addEventListener("submit", () => {
+    window._pendingReceiptDataUrl = null;
+    clearReceiptPreview();
+  });
+
+  bindReceiptScanner();
 
   handleSubmit("#savings-form", "savings", (data) => ({
     name: data.name.trim(), target: Number(data.target),
@@ -1537,6 +1555,158 @@ function bindUserName() {
   document.getElementById("user-name-input")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") document.getElementById("user-name-save")?.click();
   });
+}
+
+// ══════════════════════════════════════════
+// ── RECEIPT SCANNER (OCR) ──
+// ══════════════════════════════════════════
+window._pendingReceiptDataUrl = null;
+
+function clearReceiptPreview() {
+  const previewWrap = document.getElementById("receipt-preview-wrap");
+  const uploadLabel = document.getElementById("receipt-upload-label");
+  const ocrStatus   = document.getElementById("receipt-ocr-status");
+  const ocrResult   = document.getElementById("receipt-ocr-result");
+  const fileInput   = document.getElementById("receipt-file-input");
+  if (previewWrap) previewWrap.classList.add("hidden");
+  if (uploadLabel) uploadLabel.classList.remove("hidden");
+  if (ocrStatus)   { ocrStatus.classList.add("hidden"); ocrStatus.textContent = ""; }
+  if (ocrResult)   ocrResult.classList.add("hidden");
+  if (fileInput)   fileInput.value = "";
+  window._pendingReceiptDataUrl = null;
+}
+
+function extractReceiptData(text) {
+  // --- Amount extraction ---
+  // Try: S/ 123.45, S/.123.45, S/123, 123.45 soles, 123,45
+  const amountPatterns = [
+    /S\/\.?\s*([\d,]+\.?\d*)/i,
+    /(?:monto|total|importe|subtotal|a\s+pagar|pagar)[:\s]*S?\/?\s*([\d,]+\.?\d*)/i,
+    /\b(\d{1,6}[.,]\d{2})\b/,
+    /\b(\d{1,6})\b(?:\s*soles?)?/i,
+  ];
+  let amount = null;
+  for (const pat of amountPatterns) {
+    const m = text.match(pat);
+    if (m) {
+      const raw = m[1].replace(",", ".");
+      const val = parseFloat(raw);
+      if (!isNaN(val) && val > 0 && val < 999999) { amount = val.toFixed(2); break; }
+    }
+  }
+
+  // --- Date extraction ---
+  // Try: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, "15 de enero de 2024"
+  const monthNames = { enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12 };
+  let date = null;
+
+  // Numeric formats
+  const numDatePatterns = [
+    /(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})/,  // DD/MM/YYYY
+    /(\d{4})[\/\-\.](\d{2})[\/\-\.](\d{2})/,  // YYYY-MM-DD
+    /(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{2})/,  // DD/MM/YY
+  ];
+  for (const pat of numDatePatterns) {
+    const m = text.match(pat);
+    if (m) {
+      let y, mo, d;
+      if (m[1].length === 4) { [, y, mo, d] = m; }
+      else if (parseInt(m[3]) > 31) { [, d, mo, y] = m; }  // DD/MM/YYYY
+      else { [, d, mo, y] = m; if (y.length === 2) y = "20" + y; }
+      mo = String(mo).padStart(2,"0"); d = String(d).padStart(2,"0");
+      const candidate = `${y}-${mo}-${d}`;
+      if (!isNaN(Date.parse(candidate))) { date = candidate; break; }
+    }
+  }
+
+  // Textual format: "15 de enero de 2024"
+  if (!date) {
+    const mTxt = text.toLowerCase().match(/(\d{1,2})\s+de\s+(\w+)\s+(?:de\s+)?(\d{4})/);
+    if (mTxt) {
+      const mo = monthNames[mTxt[2]];
+      if (mo) {
+        const candidate = `${mTxt[3]}-${String(mo).padStart(2,"0")}-${String(mTxt[1]).padStart(2,"0")}`;
+        if (!isNaN(Date.parse(candidate))) date = candidate;
+      }
+    }
+  }
+
+  return { amount, date };
+}
+
+function bindReceiptScanner() {
+  const fileInput   = document.getElementById("receipt-file-input");
+  const previewWrap = document.getElementById("receipt-preview-wrap");
+  const previewImg  = document.getElementById("receipt-preview-img");
+  const clearBtn    = document.getElementById("receipt-clear-btn");
+  const uploadLabel = document.getElementById("receipt-upload-label");
+  const ocrStatus   = document.getElementById("receipt-ocr-status");
+  const ocrResult   = document.getElementById("receipt-ocr-result");
+  const uploadText  = document.getElementById("receipt-upload-text");
+
+  if (!fileInput) return;
+
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target.result;
+      window._pendingReceiptDataUrl = dataUrl;
+      previewImg.src = dataUrl;
+      previewWrap.classList.remove("hidden");
+      uploadLabel.classList.add("hidden");
+
+      // Start OCR
+      ocrStatus.textContent = "🔍 Analizando recibo...";
+      ocrStatus.classList.remove("hidden");
+      ocrResult.classList.add("hidden");
+
+      try {
+        if (typeof Tesseract === "undefined") throw new Error("Tesseract no disponible");
+        const result = await Tesseract.recognize(dataUrl, "spa+eng", {
+          logger: (m) => {
+            if (m.status === "recognizing text") {
+              ocrStatus.textContent = `🔍 Analizando... ${Math.round(m.progress * 100)}%`;
+            }
+          },
+        });
+
+        const text = result.data.text;
+        const { amount, date } = extractReceiptData(text);
+
+        // Fill form fields
+        const form = document.getElementById("expense-form");
+        if (form) {
+          if (amount) form.querySelector('[name="amount"]').value = amount;
+          if (date)   form.querySelector('[name="date"]').value = date;
+        }
+
+        // Show result
+        ocrStatus.classList.add("hidden");
+        if (amount || date) {
+          ocrResult.innerHTML = `
+            <span class="receipt-ocr-badge">🤖 Detectado automáticamente</span>
+            ${amount ? `<span class="receipt-ocr-chip">💰 S/ ${amount}</span>` : ""}
+            ${date   ? `<span class="receipt-ocr-chip">📅 ${formatDate(date)}</span>` : ""}
+          `;
+          ocrResult.classList.remove("hidden");
+        } else {
+          ocrStatus.textContent = "⚠️ No se detectaron datos. Ingresa manualmente.";
+          ocrStatus.classList.remove("hidden");
+        }
+
+      } catch (err) {
+        ocrStatus.textContent = "⚠️ No se pudo analizar la imagen.";
+        console.warn("OCR error:", err);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  clearBtn?.addEventListener("click", clearReceiptPreview);
 }
 
 // ══════════════════════════════════════════
