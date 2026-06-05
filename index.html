@@ -2,8 +2,14 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0c0c0c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Alex App" />
+    <meta name="apple-touch-fullscreen" content="yes" />
+    <link rel="apple-touch-icon" href="icon.svg" />
     <title>Alex App</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
@@ -715,6 +721,25 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- ── MOBILE BOTTOM NAV ── -->
+    <nav class="mobile-bottom-nav" aria-label="Navegación móvil">
+      <button class="mbn-tab active" data-view="dashboard" type="button">
+        <span class="mbn-icon">⚡</span><span class="mbn-label">Inicio</span>
+      </button>
+      <button class="mbn-tab" data-view="finances" type="button">
+        <span class="mbn-icon">💰</span><span class="mbn-label">Finanzas</span>
+      </button>
+      <button class="mbn-tab" data-view="organizer" type="button">
+        <span class="mbn-icon">✅</span><span class="mbn-label">Tareas</span>
+      </button>
+      <button class="mbn-tab" data-view="performance" type="button">
+        <span class="mbn-icon">🎯</span><span class="mbn-label">Metas</span>
+      </button>
+      <button class="mbn-tab" data-view="calendar" type="button">
+        <span class="mbn-icon">📅</span><span class="mbn-label">Agenda</span>
+      </button>
+    </nav>
+
     <script src="app.js"></script>
   </body>
 </html>

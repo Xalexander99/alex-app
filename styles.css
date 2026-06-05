@@ -1238,6 +1238,69 @@ textarea { resize: vertical; }
 .health-form input { background:var(--surface-3); border:1px solid var(--line); border-radius:7px; padding:7px 10px; color:var(--ink); font-size:0.83rem; }
 .health-form input:focus { outline:none; border-color:var(--red); }
 
+/* ══ MOBILE BOTTOM NAV ══ */
+.mobile-bottom-nav {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 700px) {
+  /* Show bottom nav, hide sidebar nav */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 6px 4px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    gap: 0;
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    background: rgba(20,20,20,0.94);
+  }
+
+  .mbn-tab {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px;
+    border: none; background: transparent;
+    color: var(--muted);
+    padding: 6px 4px;
+    border-radius: 10px;
+    transition: all 0.18s;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 52px;
+  }
+
+  .mbn-tab.active { color: var(--red); }
+  .mbn-tab.active .mbn-icon { transform: scale(1.15); }
+
+  .mbn-icon {
+    font-size: 1.35rem;
+    display: block;
+    transition: transform 0.18s;
+    line-height: 1;
+  }
+
+  .mbn-label {
+    font-size: 0.62rem; font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+
+  /* Add bottom padding to workspace so content isn't hidden behind bottom nav */
+  .workspace {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  /* Hide sidebar on mobile completely */
+  .sidebar { display: none; }
+  .app-shell { grid-template-columns: 1fr; }
+}
+
 /* ══ RESPONSIVE ══ */
 @media (max-width: 1100px) {
   .app-shell { grid-template-columns: 1fr; }
@@ -1263,22 +1326,91 @@ textarea { resize: vertical; }
 }
 
 @media (max-width: 700px) {
-  .workspace { padding: 14px 12px 24px; }
-  .topbar { flex-direction: column; align-items: flex-start; margin: -14px -12px 18px; padding: 14px 12px; }
-  .topbar-actions { width: 100%; }
-  .metric-grid, .dashboard-grid, .content-grid, .worklog-grid { grid-template-columns: 1fr; }
+  /* Workspace */
+  .workspace { padding: 0 12px calc(90px + env(safe-area-inset-bottom)); overflow-x: hidden; }
+
+  /* Topbar — compact on mobile */
+  .topbar {
+    flex-direction: row; flex-wrap: wrap;
+    align-items: center; justify-content: space-between;
+    margin: 0 -12px 16px;
+    padding: 14px 14px 12px;
+    padding-top: calc(14px + env(safe-area-inset-top));
+  }
+  .topbar > div:first-child { flex: 1; min-width: 0; }
+  .topbar h2 { font-size: 1.5rem; }
+  .topbar-actions { gap: 6px; }
+
+  /* Hide less important topbar buttons on mobile */
+  #seed-demo { display: none; }
+  #notif-btn { display: none; }
+
+  /* Search full width on mobile */
+  .global-search-wrap { order: 10; width: 100%; }
+  .global-search-input { width: 100%; box-sizing: border-box; }
+  .global-search-input:focus { width: 100%; }
+  .global-search-results { width: 100%; left: 0; right: 0; }
+
+  /* Layout stacks */
+  .metric-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dashboard-grid { grid-template-columns: 1fr; gap: 10px; }
+  .content-grid, .worklog-grid { grid-template-columns: 1fr; }
+  .income-grid { grid-template-columns: 1fr; }
+
+  /* Touch-friendly min sizes */
+  input, select, textarea { min-height: 48px; font-size: 16px !important; } /* 16px prevents iOS zoom */
+  .primary-button, .secondary-button, .ghost-button { min-height: 48px; font-size: 0.9rem; }
+  .danger-button { min-height: 44px; }
+  .org-tab { min-height: 44px; padding: 10px 14px; font-size: 0.84rem; }
+
+  /* Calendar */
   .week-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-  .calendar-grid { grid-template-columns: repeat(7, minmax(0,1fr)); }
+  .calendar-grid { gap: 2px; }
+  .cal-cell { min-height: 72px; padding: 5px 4px; }
+
+  /* Stats */
   .gym-header { grid-template-columns: repeat(3,1fr); }
   .stats-two-col { grid-template-columns: 1fr; }
   .stats-health-row { grid-template-columns: 1fr; }
   .summary-grid { grid-template-columns: 1fr; }
   .weekly-summary-grid { grid-template-columns: repeat(2,1fr); }
   .projection-grid { grid-template-columns: repeat(2,1fr); }
-  .global-search-input { width: 160px; }
-  .global-search-input:focus { width: 200px; }
-  .global-search-results { width: 260px; }
   .form-row-2 { grid-template-columns: 1fr; }
+
+  /* Goal cards full width */
+  .goals-grid { grid-template-columns: 1fr; }
+
+  /* Panels — less padding on mobile */
+  .panel { padding: 14px 12px; }
+
+  /* Metric cards */
+  .metric-card { padding: 14px; }
+  .metric-card strong { font-size: 1.3rem; }
+
+  /* List items — bigger tap targets */
+  .list-item { padding: 14px 12px; }
+
+  /* Tabs — scrollable */
+  .org-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 1px; flex-wrap: nowrap; }
+  .org-tab { white-space: nowrap; flex-shrink: 0; }
+
+  /* Goal category pills — scrollable */
+  .goal-cat-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; padding-bottom: 4px; }
+  .goal-cat-btn { flex-shrink: 0; }
+
+  /* Gym calendar days — bigger */
+  .gym-day { min-height: 42px; border-radius: 8px; }
+  .gym-day-num { font-size: 0.9rem; }
+
+  /* Receipt scanner — full width upload */
+  .receipt-upload-label { padding: 20px 12px; font-size: 0.9rem; }
+  .receipt-preview-img { max-height: 160px; }
+
+  /* Dashboard pomodoro panel */
+  .pomodoro-panel { padding: 12px; }
+
+  /* Hide topbar on mobile — info is in bottom nav */
+  #install-app { font-size: 0.8rem; padding: 0 10px; min-height: 38px; }
 }
 
 /* ══ RECEIPT SCANNER ══ */
@@ -1619,3 +1751,7 @@ label { font-size: 0.73rem; letter-spacing: 0.07em; }
 :root[data-theme="light"] .goal-card { background: #ffffff; }
 :root[data-theme="light"] .list-item { background: #ffffff; }
 :root[data-theme="light"] .list-item:hover { background: #ffffff; }
+:root[data-theme="light"] .mobile-bottom-nav { background: rgba(255,255,255,0.94); border-top-color: var(--line); }
+:root[data-theme="light"] .mbn-tab { color: #999; }
+:root[data-theme="light"] .mbn-tab.active { color: var(--red); }
+:root[data-theme="light"] .topbar { background: rgba(245,245,247,0.92); }

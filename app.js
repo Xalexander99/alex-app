@@ -105,7 +105,7 @@ function setDefaultDates() {
 // ── Views ──
 function switchView(viewId) {
   $$(".view").forEach((v) => v.classList.toggle("active-view", v.id === viewId));
-  $$(".nav-tab").forEach((t) => t.classList.toggle("active", t.dataset.view === viewId));
+  $$(".nav-tab, .mbn-tab").forEach((t) => t.classList.toggle("active", t.dataset.view === viewId));
   const titles = {
     dashboard: "Inicio", finances: "Finanzas", organizer: "Actividades",
     meetings: "Reuniones", performance: "Metas", calendar: "Calendario",
@@ -1200,7 +1200,7 @@ function renderPreformTasks() {
 
 // ── Events ──
 function bindEvents() {
-  $$(".nav-tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+  $$(".nav-tab, .mbn-tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   $$(".org-tab[data-org]").forEach((tab) => tab.addEventListener("click", () => switchOrgTab(tab.dataset.org)));
   $$(".org-tab[data-fin]").forEach((tab) => tab.addEventListener("click", () => switchFinTab(tab.dataset.fin)));
   $$(".org-tab[data-perf]").forEach((tab) => tab.addEventListener("click", () => switchPerfTab(tab.dataset.perf)));
@@ -2462,5 +2462,11 @@ document.body.addEventListener("click", (e) => {
 });
 
 render();
+
+// Handle ?view= URL param (PWA shortcuts)
+const urlView = new URLSearchParams(location.search).get("view");
+const validViews = ["dashboard","finances","organizer","meetings","performance","calendar"];
+if (urlView && validViews.includes(urlView)) switchView(urlView);
+else switchView("dashboard");
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");

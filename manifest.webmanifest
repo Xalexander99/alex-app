@@ -1,17 +1,43 @@
 {
   "name": "Alex App",
-  "short_name": "Alex App",
-  "description": "Centro personal para finanzas, tareas, reuniones y notas.",
-  "start_url": "./index.html",
+  "short_name": "Alex",
+  "description": "Centro personal para finanzas, tareas, metas y calendario.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f6f3ed",
-  "theme_color": "#18211b",
+  "orientation": "portrait-primary",
+  "background_color": "#0c0c0c",
+  "theme_color": "#0c0c0c",
+  "lang": "es",
+  "categories": ["productivity", "finance", "lifestyle"],
   "icons": [
     {
       "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nueva tarea",
+      "short_name": "Tarea",
+      "description": "Agregar una tarea rápida",
+      "url": "./?view=organizer",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Nuevo gasto",
+      "short_name": "Gasto",
+      "description": "Registrar un gasto",
+      "url": "./?view=finances",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
     }
   ]
 }
