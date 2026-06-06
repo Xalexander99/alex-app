@@ -42,6 +42,7 @@ const emptyState = {
   mood: {},
   debts: [],
   recurringExpenses: [],
+  mentalLogs: [],
 };
 
 let state = loadState();
@@ -147,6 +148,7 @@ function switchPerfTab(tabId) {
   if (tabId === "stats") { renderGym(); renderWorkLog(); }
   if (tabId === "goals") renderGoals();
   if (tabId === "history") renderGoalHistory();
+  if (tabId === "mental") renderMental();
 }
 
 // ── Contexts ──
@@ -1632,6 +1634,330 @@ function extractReceiptData(text) {
   }
 
   return { amount, date };
+}
+
+// ══════════════════════════════════════════
+// ── MENTAL HEALTH MODULE ──
+// ══════════════════════════════════════════
+
+const EMOTION_CONFIG = {
+  feliz:     { emoji: "😄", color: "#f4a261", label: "Feliz",     sentiment: 1 },
+  tranquilo: { emoji: "😌", color: "#2ecc71", label: "Tranquilo", sentiment: 1 },
+  motivado:  { emoji: "🔥", color: "#e63946", label: "Motivado",  sentiment: 1 },
+  triste:    { emoji: "😢", color: "#4dabf7", label: "Triste",    sentiment: -1 },
+  enojado:   { emoji: "😠", color: "#e63946", label: "Enojado",   sentiment: -1 },
+  ansioso:   { emoji: "😰", color: "#9775fa", label: "Ansioso",   sentiment: -1 },
+  frustrado: { emoji: "😤", color: "#f4a261", label: "Frustrado", sentiment: -1 },
+  cansado:   { emoji: "😴", color: "#888888", label: "Cansado",   sentiment: 0  },
+};
+
+const EMOTION_KEYWORDS = {
+  feliz:     ["feliz","alegre","contento","bien","genial","excelente","increíble","maravilloso","emocionado","agradecido","gratitud","ríe","reí","disfruté","disfrutar","logré","logro","celebré"],
+  tranquilo: ["tranquilo","relajado","calmado","paz","sereno","descansado","libre","seguro","calma","equilibrio","estable"],
+  motivado:  ["motivado","motivación","energía","enfocado","productivo","avancé","avanzar","logré","meta","objetivo","ganas","entusiasmo","inspirado"],
+  triste:    ["triste","tristeza","mal","deprimido","decaído","melancólico","lloré","llorar","solo","soledad","vacío","nostalgia","extraño","perdí","perdida","dolor"],
+  enojado:   ["enojado","enojo","molesto","frustrado","furioso","rabia","ira","irritado","fastidiado","harto","explotó","grité","pelea","discutí","discusión"],
+  ansioso:   ["ansioso","ansiedad","nervioso","nerviosismo","preocupado","preocupación","estresado","estrés","angustiado","angustia","inseguro","miedo","temo","temor","incertidumbre"],
+  frustrado: ["frustrado","frustración","bloqueado","atascado","sin avance","no pude","fallé","fracasé","salió mal","difícil","dificultad"],
+  cansado:   ["cansado","agotado","exhausto","sin energía","dormí poco","sin dormir","fatigado","pesado","lento","somnoliento"],
+};
+
+function detectEmotions(text) {
+  const lower = text.toLowerCase();
+  const found = [];
+  for (const [emotion, keywords] of Object.entries(EMOTION_KEYWORDS)) {
+    if (keywords.some((kw) => lower.includes(kw))) found.push(emotion);
+  }
+  return found;
+}
+
+function getSentimentScore(emotions) {
+  if (!emotions.length) return 0;
+  const total = emotions.reduce((s, e) => s + (EMOTION_CONFIG[e]?.sentiment ?? 0), 0);
+  return Math.round((total / emotions.length) * 10) / 10;
+}
+
+function getSentimentLabel(score) {
+  if (score > 0.3)  return { label: "Positivo 🌟", color: "#2ecc71" };
+  if (score < -0.3) return { label: "Difícil 🌧️",  color: "#4dabf7" };
+  return { label: "Neutro ☁️", color: "#888" };
+}
+
+// ── Selected tags state ──
+let mentalSelectedTags = [];
+
+function renderMental() {
+  const today = todayISO();
+  const el = document.getElementById("mental-date");
+  if (el && !el.value) el.value = today;
+
+  renderMentalStats();
+  renderMentalList();
+  renderMentalTrend();
+  renderMentalInsight();
+  bindMentalForm();
+  updateMentalTodayPreview();
+}
+
+function renderMentalStats() {
+  const logs = state.mentalLogs || [];
+  const grid = document.getElementById("mental-stats-grid");
+  if (!grid) return;
+
+  // Count by emotion
+  const counts = {};
+  logs.forEach((log) => (log.emotions || []).forEach((e) => { counts[e] = (counts[e] || 0) + 1; }));
+
+  // Overall sentiment
+  const scores = logs.map((l) => getSentimentScore(l.emotions || []));
+  const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  const sentiment = getSentimentLabel(avgScore);
+
+  // Positive streak
+  const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+  let streak = 0;
+  for (const log of sorted) {
+    if (getSentimentScore(log.emotions || []) >= 0) streak++;
+    else break;
+  }
+
+  // Top emotion
+  const topEmotion = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+
+  grid.innerHTML = `
+    <div class="mental-stat-card" style="border-color:${sentiment.color}22">
+      <span class="mental-stat-num" style="color:${sentiment.color}">${sentiment.label}</span>
+      <span class="mental-stat-label">Estado general</span>
+    </div>
+    <div class="mental-stat-card">
+      <span class="mental-stat-num">${logs.length}</span>
+      <span class="mental-stat-label">Registros totales</span>
+    </div>
+    <div class="mental-stat-card" style="border-color:rgba(46,204,113,0.3)">
+      <span class="mental-stat-num" style="color:var(--green)">${streak} 🔥</span>
+      <span class="mental-stat-label">Racha positiva</span>
+    </div>
+    <div class="mental-stat-card">
+      <span class="mental-stat-num">${topEmotion ? `${EMOTION_CONFIG[topEmotion[0]]?.emoji || "?"} ${topEmotion[1]}d` : "—"}</span>
+      <span class="mental-stat-label">Emoción frecuente</span>
+    </div>
+  `;
+}
+
+function renderMentalInsight() {
+  const logs = state.mentalLogs || [];
+  const textEl = document.getElementById("mental-insight-text");
+  const chipsEl = document.getElementById("mental-emotion-chips");
+  if (!textEl || !chipsEl) return;
+
+  if (!logs.length) {
+    textEl.textContent = "Escribe tu primer registro para ver el análisis.";
+    chipsEl.innerHTML = "";
+    return;
+  }
+
+  // Count emotions in last 30 days
+  const since = new Date(); since.setDate(since.getDate() - 30);
+  const sinceISO = since.toISOString().slice(0, 10);
+  const recent = logs.filter((l) => l.date >= sinceISO);
+  const counts = {};
+  recent.forEach((l) => (l.emotions || []).forEach((e) => { counts[e] = (counts[e] || 0) + 1; }));
+
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const positives = sorted.filter(([e]) => EMOTION_CONFIG[e]?.sentiment > 0);
+  const negatives = sorted.filter(([e]) => EMOTION_CONFIG[e]?.sentiment < 0);
+  const dominantPos = positives[0];
+  const dominantNeg = negatives[0];
+
+  let insight = "";
+  if (dominantPos && dominantNeg) {
+    insight = `En los últimos 30 días tu emoción más frecuente fue "${EMOTION_CONFIG[dominantPos[0]]?.label}" (${dominantPos[1]} días) aunque también hubo momentos de "${EMOTION_CONFIG[dominantNeg[0]]?.label}" (${dominantNeg[1]} días).`;
+  } else if (dominantPos) {
+    insight = `¡Buen mes! Tu emoción dominante fue "${EMOTION_CONFIG[dominantPos[0]]?.label}" con ${dominantPos[1]} días registrados.`;
+  } else if (dominantNeg) {
+    insight = `Fue un período desafiante. La emoción más registrada fue "${EMOTION_CONFIG[dominantNeg[0]]?.label}" (${dominantNeg[1]} días). Recuerda que está bien pedir apoyo.`;
+  } else {
+    insight = `Tienes ${recent.length} registros este mes. Sigue escribiendo para obtener un análisis más completo.`;
+  }
+
+  textEl.textContent = insight;
+  chipsEl.innerHTML = sorted.slice(0, 5).map(([e, n]) => {
+    const cfg = EMOTION_CONFIG[e] || {};
+    return `<span class="mental-chip" style="background:${cfg.color}22;border-color:${cfg.color}44;color:${cfg.color}">${cfg.emoji || ""} ${cfg.label || e} <strong>${n}d</strong></span>`;
+  }).join("");
+}
+
+function renderMentalTrend() {
+  const container = document.getElementById("mental-trend-chart");
+  const label = document.getElementById("mental-trend-label");
+  if (!container) return;
+
+  // Last 14 days
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+
+  const logs = state.mentalLogs || [];
+  const byDate = {};
+  logs.forEach((l) => { byDate[l.date] = l; });
+
+  if (label) label.textContent = "Últimos 14 días";
+
+  container.innerHTML = `
+    <div class="mental-trend-bars">
+      ${days.map((day) => {
+        const log = byDate[day];
+        const emotions = log?.emotions || [];
+        const score = getSentimentScore(emotions);
+        const sentiment = getSentimentLabel(score);
+        const hasLog = !!log;
+        const d = new Date(day + "T00:00:00");
+        const dayName = d.toLocaleDateString("es-PE", { weekday: "short" });
+        const dayNum = d.getDate();
+        const isToday = day === todayISO();
+        const barHeight = hasLog ? Math.max(20, Math.abs(score) * 60 + 20) : 6;
+        const barColor = hasLog ? sentiment.color : "var(--line)";
+        const emotion = emotions[0] ? (EMOTION_CONFIG[emotions[0]]?.emoji || "") : "";
+        return `
+          <div class="mental-bar-col${isToday ? " mental-bar-today" : ""}">
+            <span class="mental-bar-emotion">${emotion}</span>
+            <div class="mental-bar-wrap">
+              <div class="mental-bar" style="height:${barHeight}px;background:${barColor}" title="${hasLog ? emotions.map((e) => EMOTION_CONFIG[e]?.label || e).join(", ") : "Sin registro"}"></div>
+            </div>
+            <span class="mental-bar-day">${isToday ? "Hoy" : dayName}</span>
+            <span class="mental-bar-num">${dayNum}</span>
+          </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function updateMentalTodayPreview() {
+  const today = todayISO();
+  const existing = (state.mentalLogs || []).find((l) => l.date === today);
+  const preview = document.getElementById("mental-today-preview");
+  if (!preview) return;
+  if (existing) {
+    const cfg0 = existing.emotions?.[0] ? EMOTION_CONFIG[existing.emotions[0]] : null;
+    preview.innerHTML = `<span style="color:var(--green);font-weight:700">✓ Ya tienes un registro hoy</span>${cfg0 ? ` · ${cfg0.emoji} ${cfg0.label}` : ""}`;
+    preview.classList.remove("hidden");
+  } else {
+    preview.classList.add("hidden");
+  }
+}
+
+function renderMentalList() {
+  const list = document.getElementById("mental-list");
+  const countEl = document.getElementById("mental-history-count");
+  const logs = (state.mentalLogs || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+  if (countEl) countEl.textContent = `${logs.length} entradas`;
+  if (!list) return;
+  list.innerHTML = "";
+  if (!logs.length) {
+    list.innerHTML = `<p class="empty-message">Sin registros aún. ¡Escribe cómo te fue hoy!</p>`;
+    return;
+  }
+  logs.slice(0, 30).forEach((log) => {
+    const el = document.createElement("div");
+    el.className = "list-item mental-log-item";
+    const score = getSentimentScore(log.emotions || []);
+    const sentiment = getSentimentLabel(score);
+    const chipsHtml = (log.emotions || []).map((e) => {
+      const cfg = EMOTION_CONFIG[e] || {};
+      return `<span class="mental-chip mental-chip-sm" style="background:${cfg.color}22;border-color:${cfg.color}44;color:${cfg.color}">${cfg.emoji || ""} ${cfg.label || e}</span>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="item-main">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="item-title">${formatDate(log.date)}</span>
+            <span class="mental-sentiment-dot" style="color:${sentiment.color};font-size:0.78rem">${sentiment.label}</span>
+          </div>
+          ${chipsHtml ? `<div class="mental-chip-row">${chipsHtml}</div>` : ""}
+          ${log.text ? `<p class="mental-log-text">${escapeHTML(log.text.slice(0, 180))}${log.text.length > 180 ? "…" : ""}</p>` : ""}
+        </div>
+        <button class="danger-button" data-delete-mental="${log.id}" type="button" style="flex-shrink:0;align-self:flex-start">✕</button>
+      </div>`;
+    el.querySelector("[data-delete-mental]")?.addEventListener("click", () => {
+      state.mentalLogs = (state.mentalLogs || []).filter((l) => l.id !== log.id);
+      saveState(); renderMental();
+    });
+    list.appendChild(el);
+  });
+}
+
+function bindMentalForm() {
+  // Tag picker
+  document.querySelectorAll(".mental-tag-btn").forEach((btn) => {
+    const tag = btn.dataset.tag;
+    btn.classList.toggle("active", mentalSelectedTags.includes(tag));
+    btn.onclick = () => {
+      if (mentalSelectedTags.includes(tag)) {
+        mentalSelectedTags = mentalSelectedTags.filter((t) => t !== tag);
+      } else {
+        mentalSelectedTags.push(tag);
+      }
+      btn.classList.toggle("active", mentalSelectedTags.includes(tag));
+    };
+  });
+
+  // Live emotion detection as user types
+  const textarea = document.getElementById("mental-text");
+  const detectedWrap = document.getElementById("mental-detected-emotions");
+  const detectedChips = document.getElementById("mental-detected-chips");
+
+  if (textarea && !textarea._mentalBound) {
+    textarea._mentalBound = true;
+    textarea.addEventListener("input", () => {
+      const text = textarea.value;
+      if (text.length < 10) { detectedWrap?.classList.add("hidden"); return; }
+      const emotions = detectEmotions(text);
+      if (emotions.length && detectedChips && detectedWrap) {
+        detectedChips.innerHTML = emotions.map((e) => {
+          const cfg = EMOTION_CONFIG[e] || {};
+          return `<span class="mental-chip mental-chip-sm" style="background:${cfg.color}22;border-color:${cfg.color}44;color:${cfg.color}">${cfg.emoji || ""} ${cfg.label || e}</span>`;
+        }).join("");
+        detectedWrap.classList.remove("hidden");
+      } else {
+        detectedWrap?.classList.add("hidden");
+      }
+    });
+  }
+
+  // Save button
+  const saveBtn = document.getElementById("mental-save-btn");
+  if (saveBtn && !saveBtn._mentalBound) {
+    saveBtn._mentalBound = true;
+    saveBtn.addEventListener("click", () => {
+      const text = (document.getElementById("mental-text")?.value || "").trim();
+      const date = document.getElementById("mental-date")?.value || todayISO();
+      if (!text && !mentalSelectedTags.length) {
+        alert("Escribe algo o selecciona al menos una emoción.");
+        return;
+      }
+      const autoEmotions = text ? detectEmotions(text) : [];
+      const allEmotions = [...new Set([...mentalSelectedTags, ...autoEmotions])];
+
+      // Replace if same date already exists
+      const existing = (state.mentalLogs || []).findIndex((l) => l.date === date);
+      const entry = { id: uid(), date, text, emotions: allEmotions, createdAt: Date.now() };
+      if (existing >= 0) {
+        if (!confirm("Ya tienes un registro para esta fecha. ¿Reemplazarlo?")) return;
+        state.mentalLogs[existing] = entry;
+      } else {
+        state.mentalLogs = [...(state.mentalLogs || []), entry];
+      }
+
+      saveState();
+      // Reset form
+      if (document.getElementById("mental-text")) document.getElementById("mental-text").value = "";
+      mentalSelectedTags = [];
+      document.getElementById("mental-detected-emotions")?.classList.add("hidden");
+      renderMental();
+    });
+  }
 }
 
 function bindReceiptScanner() {

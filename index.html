@@ -476,6 +476,7 @@
             <button class="org-tab active" data-perf="goals">🎯 Metas</button>
             <button class="org-tab" data-perf="history">🏆 Historial</button>
             <button class="org-tab" data-perf="stats">📊 Estadísticas</button>
+            <button class="org-tab" data-perf="mental">🧠 Mental</button>
           </div>
 
           <!-- Metas -->
@@ -668,6 +669,81 @@
 
             </div>
           </div>
+
+          <!-- ══ MENTAL ══ -->
+          <div id="perf-mental" class="org-panel hidden">
+
+            <!-- Dashboard emocional -->
+            <div class="mental-dashboard">
+
+              <!-- Resumen IA -->
+              <div class="panel mental-insight-panel">
+                <div class="panel-header">
+                  <h3>🤖 Resumen emocional</h3>
+                  <span id="mental-period-label" class="item-meta">Últimos 30 días</span>
+                </div>
+                <div id="mental-insight-text" class="mental-insight-text">
+                  Escribe tu primer registro para ver el análisis.
+                </div>
+                <div id="mental-emotion-chips" class="mental-emotion-chips"></div>
+              </div>
+
+              <!-- Stats rápidas -->
+              <div class="mental-stats-grid" id="mental-stats-grid"></div>
+
+            </div>
+
+            <!-- Tendencia semanal -->
+            <div class="panel" style="margin-bottom:14px">
+              <div class="panel-header"><h3>📈 Tendencia emocional</h3><span class="item-meta" id="mental-trend-label"></span></div>
+              <div class="mental-trend-chart" id="mental-trend-chart"></div>
+            </div>
+
+            <!-- Nueva entrada + historial -->
+            <div class="content-grid">
+
+              <!-- Formulario -->
+              <div class="panel form-panel">
+                <div class="panel-header"><h3>✍️ Registro de hoy</h3></div>
+                <div id="mental-today-preview" class="mental-today-preview hidden"></div>
+                <label>Fecha<input type="date" id="mental-date" /></label>
+                <label>
+                  ¿Cómo te fue? ¿Qué sentiste?
+                  <textarea id="mental-text" rows="5" placeholder="Hoy me sentí... Lo que más me afectó fue... Estoy preocupado por... También hubo momentos de..."></textarea>
+                </label>
+                <!-- Emociones detectadas automáticamente -->
+                <div id="mental-detected-emotions" class="mental-detected-emotions hidden">
+                  <span class="mental-det-label">🤖 Detectado:</span>
+                  <div id="mental-detected-chips" class="mental-emotion-chips"></div>
+                </div>
+                <!-- Tags manuales opcionales -->
+                <label>Etiquetas (opcional)
+                  <div class="mental-tag-picker" id="mental-tag-picker">
+                    <button type="button" class="mental-tag-btn" data-tag="feliz">😄 Feliz</button>
+                    <button type="button" class="mental-tag-btn" data-tag="tranquilo">😌 Tranquilo</button>
+                    <button type="button" class="mental-tag-btn" data-tag="triste">😢 Triste</button>
+                    <button type="button" class="mental-tag-btn" data-tag="enojado">😠 Enojado</button>
+                    <button type="button" class="mental-tag-btn" data-tag="ansioso">😰 Ansioso</button>
+                    <button type="button" class="mental-tag-btn" data-tag="cansado">😴 Cansado</button>
+                    <button type="button" class="mental-tag-btn" data-tag="motivado">🔥 Motivado</button>
+                    <button type="button" class="mental-tag-btn" data-tag="frustrado">😤 Frustrado</button>
+                  </div>
+                </label>
+                <button class="primary-button" id="mental-save-btn" type="button">Guardar registro</button>
+              </div>
+
+              <!-- Historial -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h3>📖 Historial</h3>
+                  <span id="mental-history-count" class="item-meta"></span>
+                </div>
+                <div id="mental-list" class="item-list"></div>
+              </div>
+
+            </div>
+          </div>
+
         </section>
 
         <!-- ══ CALENDARIO ══ -->
