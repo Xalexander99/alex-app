@@ -294,6 +294,50 @@ function renderList(selector, items, renderer, emptyMsg) {
 }
 
 // ── Dashboard ──
+// ── Reactive mascot: a small companion that reflects today's progress ──
+let _lastMascotStage = null;
+function renderMascot() {
+  const emojiEl = $("#mascot-emoji"), msgEl = $("#mascot-msg"), subEl = $("#mascot-sub"), card = $("#mascot-card");
+  if (!emojiEl || !msgEl) return;
+  const today = todayISO();
+  const tasksToday = (state.tasks || []).filter((t) => t.dueDate === today);
+  const doneToday = tasksToday.filter((t) => t.done).length;
+  const totalToday = tasksToday.length;
+  const gymToday = (state.gym || []).some((g) => g.date === today);
+  const mentalToday = (state.mentalLogs || []).some((l) => l.date === today);
+  const score = doneToday + (gymToday ? 1 : 0) + (mentalToday ? 1 : 0);
+  const max = Math.max(1, totalToday + 2);
+  const ratio = score / max;
+
+  let stage, emoji, msg, sub;
+  if (totalToday === 0 && score === 0) {
+    stage = "idle"; emoji = "🌱"; msg = "Un nuevo día, un lienzo en blanco";
+    sub = "Agrega una tarea o registra algo para empezar";
+  } else if (ratio >= 1) {
+    stage = "fire"; emoji = "🔥"; msg = "¡Día perfecto! Estás imparable";
+    sub = `${doneToday}/${totalToday || "—"} tareas · todo registrado hoy`;
+  } else if (ratio >= 0.6) {
+    stage = "happy"; emoji = "🤩"; msg = "¡Vas muy bien hoy!";
+    sub = `${doneToday}/${totalToday} tareas completadas`;
+  } else if (ratio > 0) {
+    stage = "ok"; emoji = "🙂"; msg = "Buen avance, sigue así";
+    sub = `${doneToday}/${totalToday} tareas · cada paso cuenta`;
+  } else {
+    stage = "sleepy"; emoji = "😴"; msg = "Aún no hay actividad hoy";
+    sub = "Tu compañero te espera — ¡anímate a avanzar algo!";
+  }
+  msgEl.textContent = msg;
+  if (subEl) subEl.textContent = sub;
+  emojiEl.textContent = emoji;
+  if (stage !== _lastMascotStage) {
+    emojiEl.classList.remove("mascot-react");
+    void emojiEl.offsetWidth;
+    emojiEl.classList.add("mascot-react");
+    if (stage === "fire" && _lastMascotStage && _lastMascotStage !== "fire" && !prefersReducedMotion()) celebrate(card);
+    _lastMascotStage = stage;
+  }
+}
+
 function renderDashboard() {
   const income = state.finances.filter((i) => i.type === "income").reduce((s, i) => s + i.amount, 0);
   const expenses = state.finances.filter((i) => i.type === "expense").reduce((s, i) => s + i.amount, 0);
@@ -323,6 +367,7 @@ function renderDashboard() {
   $("#metric-goals-sub").textContent = activeGoals.length ? `${activeGoals[0].emoji || "🎯"} ${activeGoals[0].title}` : "Sin metas activas";
 
   renderList("#today-tasks", todayTasks.slice(0, 5), renderTaskItem, "No hay tareas urgentes.");
+  renderMascot();
   renderList("#recent-finances", [...state.finances].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5), renderFinanceItem, "Sin movimientos.");
 
   const goalsEl = $("#dash-goals");
@@ -2555,6 +2600,7 @@ function applyGoalTemplate(key) {
 // ── DRAG & DROP TASKS ──
 // ══════════════════════════════════════════
 let dragSrcId = null;
+let dragLastX = 0, dragLastY = 0, dragLastT = 0;
 
 function bindDragDrop() {
   document.body.addEventListener("dragstart", (e) => {
@@ -2562,10 +2608,27 @@ function bindDragDrop() {
     if (!item) return;
     dragSrcId = item.dataset.taskId;
     item.classList.add("dragging");
+    dragLastX = e.clientX; dragLastY = e.clientY; dragLastT = performance.now();
   });
   document.body.addEventListener("dragend", (e) => {
-    document.querySelectorAll(".list-item.dragging").forEach((el) => el.classList.remove("dragging"));
+    document.querySelectorAll(".list-item.dragging").forEach((el) => {
+      el.style.transition = "transform 0.5s var(--ease-elastic)";
+      el.style.transform = "rotate(0deg) scale(1)";
+      el.classList.remove("dragging");
+      setTimeout(() => { el.style.transition = ""; el.style.transform = ""; }, 520);
+    });
     document.querySelectorAll(".drag-over-item").forEach((el) => el.classList.remove("drag-over-item"));
+  });
+  // Organic "tilt" physics: card leans in the direction of movement, proportional to velocity (Cron/Amie-style)
+  document.body.addEventListener("drag", (e) => {
+    const dragging = document.querySelector(".list-item.dragging");
+    if (!dragging || !e.clientX) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - dragLastT);
+    const vx = (e.clientX - dragLastX) / dt;
+    const tilt = Math.max(-12, Math.min(12, vx * 60));
+    dragging.style.transform = `rotate(${tilt}deg) scale(1.03)`;
+    dragLastX = e.clientX; dragLastY = e.clientY; dragLastT = now;
   });
   document.body.addEventListener("dragover", (e) => {
     e.preventDefault();
