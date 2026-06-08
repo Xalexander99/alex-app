@@ -161,7 +161,7 @@ function getEventColor(ev) {
 }
 
 function renderContextSelects() {
-  const opts = state.contexts.map((c) => `<option value="${c.id}">${c.emoji} ${c.label}</option>`).join("");
+  const opts = state.contexts.map((c) => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.emoji)} ${escapeHTML(c.label)}</option>`).join("");
   $$("select[name='context']").forEach((sel) => {
     const cur = sel.value;
     sel.innerHTML = opts;
@@ -192,7 +192,7 @@ function renderCalFilters() {
   bar.innerHTML = `
     <span class="cal-filter-label">Ver:</span>
     <button class="cal-filter${calFilter === "all" ? " active" : ""}" data-ctx="all">Todos</button>
-    ${state.contexts.map((c) => `<button class="cal-filter${calFilter === c.id ? " active" : ""}" data-ctx="${c.id}">${c.emoji} ${c.label}</button>`).join("")}
+    ${state.contexts.map((c) => `<button class="cal-filter${calFilter === c.id ? " active" : ""}" data-ctx="${escapeHTML(c.id)}">${escapeHTML(c.emoji)} ${escapeHTML(c.label)}</button>`).join("")}
     ${gcalIsConnected() ? `<button class="cal-filter${calFilter === "gcal" ? " active" : ""}" data-ctx="gcal">🔵 Google</button>` : ""}
     <button class="cal-filter-manage" id="btn-manage-ctx" type="button">⚙️ Gestionar</button>`;
 
@@ -445,7 +445,7 @@ function renderTaskItem(task) {
   el.draggable = true;
   el.dataset.taskId = task.id;
   const ctx = getContextById(task.context);
-  const ctxLabel = ctx ? `${ctx.emoji} ${ctx.label}` : "";
+  const ctxLabel = ctx ? `${escapeHTML(ctx.emoji)} ${escapeHTML(ctx.label)}` : "";
   const ctxStyle = ctx ? `background:${safeColor(ctx.bg)};color:${safeColor(ctx.color)};border:1px solid ${safeColor(ctx.dot)}30` : "";
   const attachHTML = (task.attachments || []).map((a) =>
     a.type?.startsWith("image/")
@@ -495,7 +495,7 @@ function renderMeetingItem(m) {
   const el = document.createElement("article");
   el.className = "list-item";
   const ctx = getContextById(m.context);
-  const ctxLabel = ctx ? `${ctx.emoji} ${ctx.label}` : "";
+  const ctxLabel = ctx ? `${escapeHTML(ctx.emoji)} ${escapeHTML(ctx.label)}` : "";
   const ctxStyle = ctx ? `background:${safeColor(ctx.bg)};color:${safeColor(ctx.color)};border:1px solid ${safeColor(ctx.dot)}30` : "";
   el.innerHTML = `
     <div class="item-main">
@@ -698,34 +698,6 @@ function checkRepetitiveGoals() {
   if (changed) saveState();
 }
 
-function renderLinkedGoals(containerId, linkTypes) {
-  const el = $(containerId);
-  if (!el) return;
-  const linked = (state.goals || []).filter((g) => linkTypes.includes(g.linkedTo));
-  el.innerHTML = "";
-  if (!linked.length) {
-    el.innerHTML = `<p class="empty-message">Sin metas vinculadas. Crea una meta y elige "Vincular con".</p>`;
-    return;
-  }
-  linked.forEach((g) => {
-    const current = calcLinkedProgress(g);
-    const pct = Math.min(100, Math.round((current / Number(g.target)) * 100));
-    const done = pct >= 100;
-    const div = document.createElement("div");
-    div.className = `linked-goal-card${done ? " goal-done" : ""}`;
-    div.innerHTML = `
-      <div class="item-main">
-        <div>
-          <p class="item-title">${g.emoji || "🎯"} ${escapeHTML(g.title)}</p>
-          <p class="item-meta">${done ? "✅ ¡Meta completada!" : `${current} / ${g.target} ${escapeHTML(g.unit)}`}</p>
-        </div>
-        <span class="pill" style="${done ? "background:#0d2318;color:#2ecc71;border:1px solid #2ecc7133" : ""}">${pct}%</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;${done ? "background:var(--green)" : ""}"></div></div>
-      ${g.deadline ? `<p class="item-meta">Límite: ${formatDate(g.deadline)}</p>` : ""}`;
-    el.appendChild(div);
-  });
-}
 
 // ── Goals ──
 const CAT_CONFIG = {
@@ -1014,7 +986,7 @@ function showDayDetail(date, events) {
       el.className = "list-item";
       const c = getEventColor(e);
       const ctx = e.kind !== "gcal" ? getContextById(e.context) : null;
-      const label = e.kind === "gcal" ? "📅 Google" : (ctx ? `${ctx.emoji} ${ctx.label}` : "");
+      const label = e.kind === "gcal" ? "📅 Google" : (ctx ? `${escapeHTML(ctx.emoji)} ${escapeHTML(ctx.label)}` : "");
       el.style.borderLeft = `3px solid ${safeColor(c.dot)}`;
       el.innerHTML = `<div class="item-main"><div><p class="item-title">${escapeHTML(e.label)}</p>${e.time ? `<p class="item-meta">${e.time}</p>` : ""}</div>${label ? `<span class="pill" style="background:${safeColor(c.bg)};color:${safeColor(c.color)}">${escapeHTML(label)}</span>` : ""}</div>`;
       container.appendChild(el);
