@@ -1193,49 +1193,6 @@ function handleSubmit(formId, collection, mapper, gcalType) {
   });
 }
 
-// ── Seed ──
-function seedDemoData() {
-  state = {
-    ...emptyState,
-    contexts: state.contexts,
-    finances: [
-      { id: uid(), type: "income", subtype: "extra", description: "Freelance diseño", category: "Extra", amount: 800, date: todayISO() },
-      { id: uid(), type: "expense", description: "Alquiler", category: "Casa", amount: 1200, date: todayISO() },
-      { id: uid(), type: "expense", description: "Supermercado", category: "Comida", amount: 280, date: todayISO() },
-    ],
-    jobs: [
-      { id: "job1", name: "Empresa Principal S.A.", amount: 3500, payDay: 15 },
-      { id: "job2", name: "Consultora XYZ", amount: 2200, payDay: 30 },
-    ],
-    tasks: [
-      { id: uid(), title: "Enviar informe mensual", body: "Incluir gráficos de ventas", dueDate: todayISO(), context: "trabajo", done: false, attachments: [] },
-      { id: uid(), title: "Pagar servicios", body: "", dueDate: todayISO(), context: "personal", done: false, attachments: [] },
-    ],
-    meetings: [
-      { id: uid(), title: "Reunión de equipo", people: "Equipo", date: todayISO(), time: "10:00", notes: "Revisar métricas", context: "trabajo" },
-    ],
-    notes: [
-      { id: uid(), title: "Meta del trimestre", tag: "Finanzas", body: "Alcanzar S/ 2,000 de ahorro.", createdAt: new Date().toISOString() },
-    ],
-    gym: [
-      { id: uid(), date: todayISO(), note: "" },
-    ],
-    goals: [
-      { id: uid(), emoji: "🏦", title: "Fondo de emergencia", type: "financiera", target: 5000, current: 1500, unit: "S/", deadline: "" },
-      { id: uid(), emoji: "💪", title: "Ir al gym 20 días", type: "personal", target: 20, current: 8, unit: "días", deadline: "" },
-    ],
-    savings: [
-      { id: uid(), name: "Viaje a Europa", target: 8000, current: 2000, deadline: "2027-06-01", emoji: "✈️" },
-    ],
-    investments: [
-      { id: uid(), name: "Fondo mutuo Sura", type: "Fondo mutuo", amount: 3000, date: todayISO(), notes: "Tasa 6.5% anual" },
-    ],
-    workLogs: [
-      { id: uid(), project: "Proyecto Alpha", hours: 3, date: todayISO(), notes: "Avancé el módulo de reportes" },
-    ],
-  };
-  saveState(); render();
-}
 
 function exportData() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -1355,11 +1312,6 @@ function bindEvents() {
   // Pre-form: also submit on Enter key
   $("#goal-preform-title")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); $("#goal-preform-submit")?.click(); }
-  });
-  $("#seed-demo")?.addEventListener("click", () => {
-    const hasData = (state.tasks?.length || state.finances?.length || state.goals?.length || state.notes?.length || state.meetings?.length);
-    if (hasData && !confirm("⚠️ Esto reemplazará TODOS tus datos actuales con datos de ejemplo.\n\nSi quieres conservar tus datos, cancela y usa primero '⬇ Exportar' para hacer un respaldo.\n\n¿Continuar de todos modos?")) return;
-    seedDemoData();
   });
   $("#export-data")?.addEventListener("click", exportData);
 
