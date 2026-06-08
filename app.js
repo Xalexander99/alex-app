@@ -106,6 +106,12 @@ function setDefaultDates() {
 // ── Views ──
 function switchView(viewId) {
   $$(".view").forEach((v) => v.classList.toggle("active-view", v.id === viewId));
+  const activeView = document.getElementById(viewId);
+  if (activeView) {
+    activeView.classList.remove("view-enter");
+    void activeView.offsetWidth; // restart animation
+    activeView.classList.add("view-enter");
+  }
   $$(".nav-tab, .mbn-tab").forEach((t) => t.classList.toggle("active", t.dataset.view === viewId));
   const titles = {
     dashboard: "Inicio", finances: "Finanzas", organizer: "Actividades",
@@ -272,6 +278,9 @@ function renderContextManager() {
 }
 
 // ── Escaping ──
+function prefersReducedMotion() {
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 function escapeHTML(v) {
   return String(v || "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
 }
@@ -300,7 +309,11 @@ function renderDashboard() {
   // Goals
   const activeGoals = (state.goals || []).filter((g) => Number(g.current) < Number(g.target));
 
-  $("#metric-balance").textContent = formatMoney(totalIncome - expenses);
+  const balanceEl = $("#metric-balance");
+  if (balanceEl) {
+    const newVal = formatMoney(totalIncome - expenses);
+    if (balanceEl.textContent !== newVal) { balanceEl.textContent = newVal; bumpCounter(balanceEl); }
+  }
   $("#metric-income-expense").textContent = `Ingresos ${formatMoney(totalIncome)} · Gastos ${formatMoney(expenses)}`;
   $("#metric-open-tasks").textContent = openTasks.length;
   $("#metric-due-tasks").textContent = `${todayTasks.length} para hoy o vencidas`;
@@ -464,7 +477,7 @@ function renderTaskItem(task) {
   el.innerHTML = `
     <div class="item-main">
       <div>
-        <p class="item-title">${escapeHTML(task.title)}</p>
+        <p class="item-title">${task.done ? `<span class="task-strike-text">${escapeHTML(task.title)}</span>` : escapeHTML(task.title)}</p>
         <p class="item-meta">${formatDate(task.dueDate)}</p>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -784,6 +797,14 @@ function renderGoals() {
         <button class="danger-button" data-delete-goal="${g.id}" type="button">✕</button>
       </div>`;
     container.appendChild(card);
+    // Celebrate the moment a goal first reaches 100% — confetti + glow pulse, once per goal
+    if (done && !celebratedGoals.has(g.id)) {
+      celebratedGoals.add(g.id);
+      if (!prefersReducedMotion()) {
+        card.classList.add("goal-celebrate");
+        celebrate(card);
+      }
+    }
   });
 }
 
@@ -893,6 +914,7 @@ let calendarDate = new Date();
 let calView = "week";
 let calFilter = "all";
 let goalCatFilter = "all";
+const celebratedGoals = new Set((state.goals || []).filter((g) => Math.min(100, Math.round((calcLinkedProgress(g) / Number(g.target || 1)) * 100)) >= 100).map((g) => g.id));
 
 function buildEventsByDate() {
   const map = {};
@@ -1176,6 +1198,36 @@ function renderPreformTasks() {
 }
 
 // ── Events ──
+// ── Motion helpers: cursor-follow glow + confetti celebration ──
+function initGlowCards() {
+  document.addEventListener("pointermove", (e) => {
+    const card = e.target.closest?.(".glow-card");
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    card.style.setProperty("--my", `${e.clientY - r.top}px`);
+  });
+}
+function celebrate(originEl) {
+  if (typeof confetti !== "function") return;
+  let x = 0.5, y = 0.5;
+  if (originEl) {
+    const r = originEl.getBoundingClientRect();
+    x = (r.left + r.width / 2) / window.innerWidth;
+    y = (r.top + r.height / 2) / window.innerHeight;
+  }
+  confetti({
+    particleCount: 70, spread: 65, startVelocity: 38, gravity: 1.1, scalar: 0.85,
+    origin: { x, y }, colors: ["#e63946", "#f4a261", "#7c5cff", "#4dabf7", "#2ecc71"],
+  });
+}
+function bumpCounter(el) {
+  if (!el) return;
+  el.classList.remove("counter-bump");
+  void el.offsetWidth;
+  el.classList.add("counter-bump");
+}
+
 function bindEvents() {
   $$(".nav-tab, .mbn-tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   $$(".org-tab[data-org]").forEach((tab) => tab.addEventListener("click", () => switchOrgTab(tab.dataset.org)));
@@ -1350,16 +1402,27 @@ function bindEvents() {
     if (toggleTask) {
       const task = state.tasks.find((t) => t.id === toggleTask.dataset.toggleTask);
       if (task) {
-        task.done = !task.done;
-        // Auto-create next occurrence for recurring tasks
-        if (task.done && task.recurrentFreq) {
-          const base = new Date(`${task.dueDate}T00:00:00`);
-          if (task.recurrentFreq === "diario")   base.setDate(base.getDate() + 1);
-          if (task.recurrentFreq === "semanal")  base.setDate(base.getDate() + 7);
-          if (task.recurrentFreq === "mensual")  base.setMonth(base.getMonth() + 1);
-          state.tasks.push({ ...task, id: uid(), done: false, dueDate: base.toISOString().slice(0,10), subtasks: (task.subtasks||[]).map((s) => ({...s, done: false})) });
+        const completing = !task.done; // becoming done now
+        const card = toggleTask.closest(".list-item");
+        const finish = () => {
+          task.done = !task.done;
+          // Auto-create next occurrence for recurring tasks
+          if (task.done && task.recurrentFreq) {
+            const base = new Date(`${task.dueDate}T00:00:00`);
+            if (task.recurrentFreq === "diario")   base.setDate(base.getDate() + 1);
+            if (task.recurrentFreq === "semanal")  base.setDate(base.getDate() + 7);
+            if (task.recurrentFreq === "mensual")  base.setMonth(base.getMonth() + 1);
+            state.tasks.push({ ...task, id: uid(), done: false, dueDate: base.toISOString().slice(0,10), subtasks: (task.subtasks||[]).map((s) => ({...s, done: false})) });
+          }
+          saveState(); render();
+        };
+        // Satisfying collapse-and-fade animation when marking a task as done
+        if (completing && card && !prefersReducedMotion()) {
+          card.classList.add("task-completing");
+          card.addEventListener("animationend", finish, { once: true });
+        } else {
+          finish();
         }
-        saveState(); render();
       }
     }
   });
@@ -2754,6 +2817,7 @@ bindWater();
 bindMood();
 bindKeyboardShortcuts();
 initGlobalSearch();
+initGlowCards();
 updateNotifBtn();
 if (Notification.permission === "granted") scheduleNotifications();
 
