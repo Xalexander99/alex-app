@@ -543,9 +543,12 @@ function renderNoteItem(note) {
 function renderFinanceItem(item) {
   const el = document.createElement("article");
   el.className = "list-item";
-  const receiptThumb = item.receiptDataUrl
-    ? `<a href="${item.receiptDataUrl}" target="_blank" title="Ver recibo" class="receipt-thumb-wrap">
-         <img src="${item.receiptDataUrl}" class="receipt-thumb" alt="Recibo" />
+  const safeReceiptUrl = typeof item.receiptDataUrl === "string" && /^data:image\//.test(item.receiptDataUrl)
+    ? escapeHTML(item.receiptDataUrl)
+    : null;
+  const receiptThumb = safeReceiptUrl
+    ? `<a href="${safeReceiptUrl}" target="_blank" title="Ver recibo" class="receipt-thumb-wrap">
+         <img src="${safeReceiptUrl}" class="receipt-thumb" alt="Recibo" />
          <span class="receipt-thumb-badge">🧾</span>
        </a>`
     : "";
