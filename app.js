@@ -1356,7 +1356,11 @@ function bindEvents() {
   $("#goal-preform-title")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); $("#goal-preform-submit")?.click(); }
   });
-  $("#seed-demo")?.addEventListener("click", seedDemoData);
+  $("#seed-demo")?.addEventListener("click", () => {
+    const hasData = (state.tasks?.length || state.finances?.length || state.goals?.length || state.notes?.length || state.meetings?.length);
+    if (hasData && !confirm("⚠️ Esto reemplazará TODOS tus datos actuales con datos de ejemplo.\n\nSi quieres conservar tus datos, cancela y usa primero '⬇ Exportar' para hacer un respaldo.\n\n¿Continuar de todos modos?")) return;
+    seedDemoData();
+  });
   $("#export-data")?.addEventListener("click", exportData);
 
   // Gym today
