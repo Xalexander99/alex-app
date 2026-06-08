@@ -445,6 +445,45 @@ function renderTasks() {
   if (filter === "done") tasks = tasks.filter((t) => t.done);
   if (goalFilter !== "all") tasks = tasks.filter((t) => t.goalId === goalFilter);
   renderList("#task-list", tasks, renderTaskItem, "Sin tareas. Agrega una o crea una desde una meta.");
+  renderTaskBento();
+}
+
+// ── Bento-style stats strip for the task dashboard ──
+function renderTaskBento() {
+  const el = $("#task-bento");
+  if (!el) return;
+  const all = state.tasks || [];
+  const today = todayISO();
+  const pending = all.filter((t) => !t.done);
+  const overdue = pending.filter((t) => t.dueDate && t.dueDate < today);
+  const dueToday = pending.filter((t) => t.dueDate === today);
+  const completedToday = all.filter((t) => t.done && t.dueDate === today).length;
+  const highPrio = pending.filter((t) => t.priority === "alta").length;
+  const nextTask = [...pending].sort(sortTasks)[0];
+
+  el.innerHTML = `
+    <div class="bento-cell glow-card bento-span-2 bento-row-2">
+      <span class="bento-label">📌 Próxima tarea</span>
+      <p class="bento-big">${nextTask ? escapeHTML(nextTask.title) : "¡Todo al día! 🎉"}</p>
+      ${nextTask ? `<span class="bento-sub">${formatDate(nextTask.dueDate)} · prioridad ${escapeHTML(nextTask.priority || "media")}</span>` : `<span class="bento-sub">No tienes pendientes activos</span>`}
+    </div>
+    <div class="bento-cell glow-card">
+      <span class="bento-label">⏳ Pendientes</span>
+      <p class="bento-num counter-roll">${pending.length}</p>
+    </div>
+    <div class="bento-cell glow-card">
+      <span class="bento-label">✅ Hoy completadas</span>
+      <p class="bento-num counter-roll" style="color:var(--green)">${completedToday}</p>
+    </div>
+    <div class="bento-cell glow-card${overdue.length ? " bento-alert" : ""}">
+      <span class="bento-label">⚠️ Atrasadas</span>
+      <p class="bento-num counter-roll" style="color:${overdue.length ? "var(--red)" : "inherit"}">${overdue.length}</p>
+    </div>
+    <div class="bento-cell glow-card">
+      <span class="bento-label">📅 Vencen hoy</span>
+      <p class="bento-num counter-roll" style="color:var(--orange, #f4a261)">${dueToday.length}</p>
+    </div>
+  `;
 }
 
 function sortTasks(a, b) {
@@ -616,7 +655,13 @@ function renderGym() {
   const monthDates = new Set((state.gym || []).map((d) => d.date));
   const monthCount = [...monthDates].filter((d) => d.startsWith(`${year}-${String(month+1).padStart(2,"0")}`)).length;
 
-  const s = $("#gym-streak"); if (s) s.textContent = streak;
+  const s = $("#gym-streak");
+  if (s) {
+    s.textContent = streak;
+    const fireIntensity = Math.min(3, Math.floor(streak / 3));
+    s.style.filter = fireIntensity ? `saturate(${1 + fireIntensity * 0.3}) brightness(${1 + fireIntensity * 0.08})` : "";
+    s.classList.toggle("streak-hot", streak >= 7);
+  }
   const w = $("#gym-week");   if (w) w.textContent = weekDays;
   const m = $("#gym-month");  if (m) m.textContent = monthCount;
 
