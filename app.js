@@ -368,6 +368,7 @@ function renderDashboard() {
 
   renderList("#today-tasks", todayTasks.slice(0, 5), renderTaskItem, "No hay tareas urgentes.");
   renderMascot();
+  renderBackupReminder();
   renderList("#recent-finances", [...state.finances].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5), renderFinanceItem, "Sin movimientos.");
 
   const goalsEl = $("#dash-goals");
@@ -1200,6 +1201,23 @@ function exportData() {
   const a = document.createElement("a");
   a.href = url; a.download = `alex-app-backup-${todayISO()}.json`; a.click();
   URL.revokeObjectURL(url);
+  localStorage.setItem("alex-last-backup", todayISO());
+  renderBackupReminder();
+}
+
+// ── Recordatorio de respaldo: avisa si han pasado 7+ días desde el último export ──
+function renderBackupReminder() {
+  const el = $("#backup-reminder");
+  if (!el) return;
+  const last = localStorage.getItem("alex-last-backup");
+  const daysSince = last ? Math.floor((Date.now() - new Date(last).getTime()) / 86400000) : Infinity;
+  if (daysSince >= 7) {
+    el.innerHTML = `⚠️ ${last ? `Han pasado ${daysSince} días desde tu último respaldo.` : "Aún no has hecho un respaldo de tus datos."} <button class="secondary-button" id="backup-now-btn" type="button">⬇ Exportar ahora</button>`;
+    el.style.display = "flex";
+    $("#backup-now-btn")?.addEventListener("click", exportData);
+  } else {
+    el.style.display = "none";
+  }
 }
 
 // ── Render all ──
@@ -2497,6 +2515,75 @@ function renderProjection() {
     <div class="proj-card"><span class="proj-num" style="color:var(--purple)">${formatMoney(monthlySave*6)}</span><span class="proj-label">Fondo 6 meses</span></div>`;
 }
 
+// ── Patrimonio neto: ahorros + inversiones - deudas ──
+function renderNetWorth() {
+  const el = document.getElementById("net-worth-card");
+  if (!el) return;
+  const savings = (state.savings || []).reduce((s, x) => s + Number(x.current || 0), 0);
+  const investments = (state.investments || []).reduce((s, x) => s + Number(x.amount || 0), 0);
+  const debts = (state.debts || []).filter((d) => d.debtType === "owes").reduce((s, d) => s + Number(d.amount || 0), 0);
+  const net = savings + investments - debts;
+  el.innerHTML = `
+    <p class="networth-total" style="color:${net >= 0 ? "var(--green)" : "var(--red)"}">${formatMoney(net)}</p>
+    <div class="networth-breakdown">
+      <div class="nw-row"><span>🏦 Ahorros</span><strong style="color:var(--green)">+${formatMoney(savings)}</strong></div>
+      <div class="nw-row"><span>📈 Inversiones</span><strong style="color:var(--green)">+${formatMoney(investments)}</strong></div>
+      <div class="nw-row"><span>💳 Deudas</span><strong style="color:var(--red)">-${formatMoney(debts)}</strong></div>
+    </div>`;
+}
+
+// ── Regla 50/30/20: necesidades / deseos / ahorro ──
+function renderRule503020() {
+  const el = document.getElementById("rule-503020");
+  if (!el) return;
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const jobIncome = (state.jobs || []).reduce((s, j) => s + Number(j.amount || 0), 0);
+  const extraIncome = (state.finances || []).filter((f) => f.type === "income" && f.date?.startsWith(curKey)).reduce((s, f) => s + f.amount, 0);
+  const totalIncome = jobIncome + extraIncome;
+  const expenses = (state.finances || []).filter((f) => f.type === "expense" && f.date?.startsWith(curKey));
+  const NEEDS = new Set(["Casa", "Comida", "Transporte", "Salud", "Servicios", "Educación"]);
+  const needs = expenses.filter((f) => NEEDS.has(f.category)).reduce((s, f) => s + f.amount, 0);
+  const wants = expenses.filter((f) => !NEEDS.has(f.category)).reduce((s, f) => s + f.amount, 0);
+  const saved = Math.max(0, totalIncome - needs - wants);
+
+  if (totalIncome <= 0) {
+    el.innerHTML = `<p class="empty-message">Registra tus ingresos del mes para ver este análisis.</p>`;
+    return;
+  }
+  const pct = (v) => Math.min(100, Math.round((v / totalIncome) * 100));
+  const rows = [
+    { label: "Necesidades (meta 50%)", val: needs, pct: pct(needs), target: 50, color: "var(--blue, #4dabf7)" },
+    { label: "Deseos (meta 30%)", val: wants, pct: pct(wants), target: 30, color: "var(--orange, #f4a261)" },
+    { label: "Ahorro (meta 20%)", val: saved, pct: pct(saved), target: 20, color: "var(--green)" },
+  ];
+  el.innerHTML = rows.map((r) => `
+    <div class="rule-bar-row">
+      <div class="rule-label"><span>${r.label}</span><strong>${formatMoney(r.val)} · ${r.pct}%</strong></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${r.pct}%;background:${r.color}"></div></div>
+    </div>`).join("") +
+    `<p class="item-meta">${needs/totalIncome <= 0.55 && saved/totalIncome >= 0.15 ? "✅ Tu distribución está saludable." : "💡 Intenta acercarte a 50/30/20 para mayor estabilidad."}</p>`;
+}
+
+// ── Simulador de interés compuesto ──
+function renderInterestSimulator() {
+  const result = document.getElementById("sim-result");
+  if (!result) return;
+  const monthly = Number(document.getElementById("sim-monthly")?.value) || 0;
+  const annualRate = Number(document.getElementById("sim-rate")?.value) || 0;
+  const years = Number(document.getElementById("sim-years")?.value) || 0;
+  const months = years * 12;
+  const r = annualRate / 100 / 12;
+  let balance = 0;
+  for (let i = 0; i < months; i++) balance = (balance + monthly) * (1 + r);
+  const contributed = monthly * months;
+  const interest = balance - contributed;
+  result.innerHTML = `
+    <div class="proj-card"><span class="proj-num" style="color:var(--green)">${formatMoney(balance)}</span><span class="proj-label">Total estimado</span></div>
+    <div class="proj-card"><span class="proj-num">${formatMoney(contributed)}</span><span class="proj-label">Total aportado</span></div>
+    <div class="proj-card"><span class="proj-num" style="color:var(--purple, #9775fa)">${formatMoney(interest)}</span><span class="proj-label">Ganado por interés</span></div>`;
+}
+
 // ══════════════════════════════════════════
 // ── GOAL HISTORY ──
 // ══════════════════════════════════════════
@@ -2873,6 +2960,7 @@ bindGcalEvents();
 bindAttachments();
 bindPomodoro();
 bindBudget();
+["sim-monthly", "sim-rate", "sim-years"].forEach((id) => document.getElementById(id)?.addEventListener("input", renderInterestSimulator));
 bindDragDrop();
 bindUserName();
 bindImportExport();
@@ -2887,7 +2975,7 @@ if (Notification.permission === "granted") scheduleNotifications();
 
 document.getElementById("notif-btn")?.addEventListener("click", requestNotifPermission);
 document.body.addEventListener("click", (e) => {
-  if (e.target.closest("[data-fin='summary']")) setTimeout(() => { renderFinanceSummary(); renderProjection(); }, 50);
+  if (e.target.closest("[data-fin='summary']")) setTimeout(() => { renderFinanceSummary(); renderProjection(); renderNetWorth(); renderRule503020(); renderInterestSimulator(); }, 50);
 });
 
 render();

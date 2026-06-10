@@ -1255,6 +1255,13 @@ textarea { resize: vertical; }
 
 /* ══ FORM ROW 2 ══ */
 .form-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+@media (max-width: 700px) { .form-row-3 { grid-template-columns: 1fr; } }
+.networth-total { font-size: 2rem; font-weight: 800; margin: 4px 0 12px; font-variant-numeric: tabular-nums; }
+.networth-breakdown { display:flex; flex-direction:column; gap:6px; font-size:0.85rem; }
+.networth-breakdown .nw-row { display:flex; justify-content:space-between; }
+.rule-bar-row { margin-bottom: 12px; }
+.rule-bar-row .rule-label { display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:4px; }
 
 /* ══ HEALTH PANELS ══ */
 .stats-health-row { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:18px; }
@@ -2178,3 +2185,19 @@ button:active, .secondary-button:active, .primary-button:active, .danger-button:
 }
 .mascot-msg { font-weight: 700; font-size: 1.02rem; margin: 0 0 2px; }
 .mascot-sub { font-size: 0.82rem; color: var(--muted, #8a8a9a); }
+
+.backup-reminder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(244,162,97,0.10);
+  border: 1px solid rgba(244,162,97,0.3);
+  color: var(--orange, #f4a261);
+  border-radius: var(--radius-sm, 10px);
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}

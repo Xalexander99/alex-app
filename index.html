@@ -86,6 +86,7 @@
 
         <!-- ══ DASHBOARD ══ -->
         <section id="dashboard" class="view active-view" aria-labelledby="view-title">
+          <div id="backup-reminder" class="backup-reminder" style="display:none"></div>
           <div id="mascot-card" class="mascot-card glow-card">
             <span id="mascot-emoji" class="mascot-emoji">🌱</span>
             <div>
@@ -356,6 +357,29 @@
               <div class="panel" style="grid-column:1/-1">
                 <div class="panel-header"><h3>📈 Proyección financiera</h3></div>
                 <div id="finance-projection" class="projection-grid"></div>
+              </div>
+
+              <!-- Patrimonio neto -->
+              <div class="panel glow-card">
+                <div class="panel-header"><h3>💎 Patrimonio neto</h3></div>
+                <div id="net-worth-card"></div>
+              </div>
+
+              <!-- Regla 50/30/20 -->
+              <div class="panel">
+                <div class="panel-header"><h3>⚖️ Regla 50/30/20</h3></div>
+                <div id="rule-503020"></div>
+              </div>
+
+              <!-- Simulador de interés compuesto -->
+              <div class="panel" style="grid-column:1/-1">
+                <div class="panel-header"><h3>🧮 Simulador de interés compuesto</h3></div>
+                <div class="form-row-3">
+                  <label>Aporte mensual (S/)<input id="sim-monthly" type="number" min="0" step="10" value="200" /></label>
+                  <label>Tasa anual (%)<input id="sim-rate" type="number" min="0" step="0.1" value="6" /></label>
+                  <label>Años<input id="sim-years" type="number" min="1" step="1" value="5" /></label>
+                </div>
+                <div id="sim-result" class="projection-grid" style="margin-top:12px"></div>
               </div>
 
             </div>
