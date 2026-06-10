@@ -2201,3 +2201,14 @@ button:active, .secondary-button:active, .primary-button:active, .danger-button:
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
+
+.opportunity-cost {
+  background: rgba(124,92,255,0.08);
+  border: 1px solid rgba(124,92,255,0.25);
+  color: #b8a8ff;
+  border-radius: var(--radius-sm, 10px);
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  animation: viewEnter 0.3s var(--ease-smooth);
+}

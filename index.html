@@ -193,6 +193,10 @@
                   <label>Descripción<input name="description" required placeholder="Freelance, venta..." /></label>
                   <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>
                   <label>Fecha<input name="date" required type="date" /></label>
+                  <label>Tipo<select name="incomeType">
+                    <option value="activo">💪 Activo</option>
+                    <option value="pasivo">🌱 Pasivo</option>
+                  </select></label>
                   <button class="primary-button income-btn" type="submit">+ Agregar</button>
                 </form>
                 <div id="extra-list" class="item-list empty-space" style="margin-top:8px"></div>
@@ -229,8 +233,9 @@
 
                 <label>Descripción<input name="description" required placeholder="Alquiler, comida..." /></label>
                 <label>Categoría<input name="category" required placeholder="Casa, comida, salud..." /></label>
-                <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" /></label>
+                <label>Monto<input name="amount" required type="number" min="0" step="0.01" placeholder="0.00" id="expense-amount-input" /></label>
                 <label>Fecha<input name="date" required type="date" /></label>
+                <div id="opportunity-cost" class="opportunity-cost hidden"></div>
                 <button class="primary-button expense-btn" type="submit">Guardar gasto</button>
               </form>
               <section class="panel list-panel">
@@ -639,11 +644,18 @@
                     <span class="gym-stat-num" id="work-sessions">0</span>
                     <span class="gym-stat-label">Sesiones mes</span>
                   </div>
+                  <div class="gym-stat">
+                    <span class="gym-stat-num" id="work-earned" style="color:var(--green)">S/ 0</span>
+                    <span class="gym-stat-label">Ganado este mes</span>
+                  </div>
                 </div>
                 <form id="worklog-form" class="panel form-panel" style="margin-bottom:14px">
                   <div class="panel-header"><h3>Registrar sesión</h3></div>
                   <label>Proyecto / tarea<input name="project" required placeholder="Nombre del proyecto..." /></label>
-                  <label>Horas<input name="hours" required type="number" min="0.5" step="0.5" max="24" placeholder="2" /></label>
+                  <div class="form-row-2">
+                    <label>Horas<input name="hours" required type="number" min="0.5" step="0.5" max="24" placeholder="2" /></label>
+                    <label>Tarifa S//h (opcional)<input name="rate" type="number" min="0" step="1" placeholder="0" /></label>
+                  </div>
                   <label>Fecha<input name="date" required type="date" /></label>
                   <label>Notas<textarea name="notes" rows="2" placeholder="¿Qué lograste?"></textarea></label>
                   <button class="primary-button" type="submit">Registrar</button>

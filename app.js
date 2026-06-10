@@ -753,12 +753,15 @@ function renderWorkLog() {
   const hw = $("#work-hours-week");  if (hw) hw.textContent = `${hoursWeek}h`;
   const hm = $("#work-hours-month"); if (hm) hm.textContent = `${hoursMonth}h`;
   const sm = $("#work-sessions");    if (sm) sm.textContent = sessMonth;
+  const earnedMonth = logs.filter((l) => l.date >= monthStart).reduce((s,l) => s + Number(l.hours) * Number(l.rate || 0), 0);
+  const we = $("#work-earned"); if (we) we.textContent = formatMoney(earnedMonth);
 
   renderList("#worklog-list", [...logs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15),
     (l) => {
       const el = document.createElement("div");
       el.className = "list-item";
-      el.innerHTML = `<div class="item-main"><div><p class="item-title">${escapeHTML(l.project)}</p><p class="item-meta">${formatDate(l.date)}${l.notes ? ` · ${escapeHTML(l.notes)}` : ""}</p></div><span class="pill">${l.hours}h</span></div>
+      const earned = l.rate ? ` · ${formatMoney(l.hours * l.rate)}` : "";
+      el.innerHTML = `<div class="item-main"><div><p class="item-title">${escapeHTML(l.project)}</p><p class="item-meta">${formatDate(l.date)}${l.notes ? ` · ${escapeHTML(l.notes)}` : ""}</p></div><span class="pill">${l.hours}h${earned}</span></div>
         <div class="item-actions"><button class="danger-button" data-delete-log="${l.id}" type="button">Eliminar</button></div>`;
       return el;
     }, "Sin sesiones registradas.");
@@ -1510,6 +1513,7 @@ function bindEvents() {
     type: "income", subtype: "extra",
     description: data.description.trim(), category: "Extra",
     amount: Number(data.amount), date: data.date,
+    incomeType: data.incomeType || "activo",
   }));
 
   handleSubmit("#expense-form", "finances", (data) => ({
@@ -1526,6 +1530,20 @@ function bindEvents() {
   });
 
   bindReceiptScanner();
+
+  // ── Opportunity cost insight on large expenses ──
+  $("#expense-amount-input")?.addEventListener("input", (e) => {
+    const el = $("#opportunity-cost");
+    if (!el) return;
+    const amount = Number(e.target.value) || 0;
+    if (amount < 100) { el.classList.add("hidden"); return; }
+    const jobIncome = (state.jobs || []).reduce((s, j) => s + Number(j.amount || 0), 0);
+    const dailyIncome = jobIncome / 30;
+    const days = dailyIncome > 0 ? (amount / dailyIncome).toFixed(1) : null;
+    const future5y = amount * Math.pow(1 + 0.06 / 12, 60); // 6% anual, 5 años, mensualizado
+    el.classList.remove("hidden");
+    el.innerHTML = `💡 ${days ? `Esto equivale a <strong>${days} días</strong> de tu sueldo. ` : ""}Si invirtieras esto al 6% anual, en 5 años serían <strong>${formatMoney(future5y)}</strong>.`;
+  });
 
   handleSubmit("#savings-form", "savings", (data) => ({
     name: data.name.trim(), target: Number(data.target),
@@ -1569,6 +1587,7 @@ function bindEvents() {
 
   handleSubmit("#worklog-form", "workLogs", (data) => ({
     project: data.project.trim(), hours: Number(data.hours),
+    rate: Number(data.rate) || 0,
     date: data.date, notes: (data.notes || "").trim(),
   }));
 
@@ -2503,6 +2522,8 @@ function renderProjection() {
   const avgExpense = lastMonths.reduce((s,k) => s + (state.finances||[]).filter((f) => f.type==="expense" && f.date?.startsWith(k)).reduce((ss,f) => ss+f.amount, 0), 0) / 3;
   const extraIncome = (state.finances||[]).filter((f) => f.type==="income" && f.date?.startsWith(curKey)).reduce((s,f) => s+f.amount, 0);
   const totalIncome = jobIncome + extraIncome;
+  const passiveIncome = (state.finances||[]).filter((f) => f.type==="income" && f.incomeType==="pasivo" && f.date?.startsWith(curKey)).reduce((s,f) => s+f.amount, 0);
+  const passivePct = totalIncome > 0 ? Math.round((passiveIncome/totalIncome)*100) : 0;
   const monthlySave = totalIncome - avgExpense;
   const saveRate = totalIncome > 0 ? Math.round((monthlySave/totalIncome)*100) : 0;
 
@@ -2512,7 +2533,8 @@ function renderProjection() {
     <div class="proj-card"><span class="proj-num" style="color:${monthlySave>=0?"var(--green)":"var(--red)"}">${formatMoney(monthlySave)}</span><span class="proj-label">Ahorro estimado/mes</span></div>
     <div class="proj-card"><span class="proj-num" style="color:var(--blue)">${formatMoney(monthlySave*12)}</span><span class="proj-label">Proyección anual</span></div>
     <div class="proj-card"><span class="proj-num">${saveRate}%</span><span class="proj-label">Tasa de ahorro</span></div>
-    <div class="proj-card"><span class="proj-num" style="color:var(--purple)">${formatMoney(monthlySave*6)}</span><span class="proj-label">Fondo 6 meses</span></div>`;
+    <div class="proj-card"><span class="proj-num" style="color:var(--purple)">${formatMoney(monthlySave*6)}</span><span class="proj-label">Fondo 6 meses</span></div>
+    <div class="proj-card"><span class="proj-num" style="color:var(--green)">${passivePct}%</span><span class="proj-label">Ingreso pasivo (${formatMoney(passiveIncome)})</span></div>`;
 }
 
 // ── Patrimonio neto: ahorros + inversiones - deudas ──
